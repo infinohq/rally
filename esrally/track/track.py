@@ -714,20 +714,6 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-class AdminTaskFilter(metaclass=Singleton):
-    """
-    Matches all tasks that execute ***REMOVED***istrative actions.
-    """
-    def matches(self, task):
-        try:
-            return OperationType.from_hyphenated_string(task.operation.type).***REMOVED***_op
-        except KeyError:
-            return False
-
-    def __str__(self, *args, **kwargs):
-        return "filter for ***REMOVED*** tasks"
-
-
 # Schedule elements
 class Parallel:
     def __init__(self, tasks, clients=None):
