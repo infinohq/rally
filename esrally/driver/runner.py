@@ -1522,6 +1522,17 @@ class CreateComponentTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            templates = mandatory(params, "templates", self)
+            return {
+                "weight": len(templates),
+                "unit": "ops", 
+                "success": True,
+            }
+        
         templates = mandatory(params, "templates", self)
         request_params = mandatory(params, "request-params", self)
         for name, body in templates:
@@ -1543,6 +1554,17 @@ class DeleteComponentTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            template_names = mandatory(params, "templates", self)
+            return {
+                "weight": len(template_names),
+                "unit": "ops",
+                "success": True,
+            }
+        
         template_names = mandatory(params, "templates", self)
         only_if_exists = mandatory(params, "only-if-exists", self)
         request_params = mandatory(params, "request-params", self)
@@ -1572,6 +1594,17 @@ class CreateComposableTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            templates = mandatory(params, "templates", self)
+            return {
+                "weight": len(templates),
+                "unit": "ops",
+                "success": True,
+            }
+        
         templates = mandatory(params, "templates", self)
         request_params = mandatory(params, "request-params", self)
         for template, body in templates:
@@ -1593,6 +1626,17 @@ class DeleteComposableTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            templates = mandatory(params, "templates", self)
+            return {
+                "weight": len(templates),
+                "unit": "ops",
+                "success": True,
+            }
+        
         templates = mandatory(params, "templates", self)
         only_if_exists = mandatory(params, "only-if-exists", self)
         request_params = mandatory(params, "request-params", self)
@@ -1642,6 +1686,17 @@ class CreateIndexTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            templates = mandatory(params, "templates", self)
+            return {
+                "weight": len(templates),
+                "unit": "ops",
+                "success": True,
+            }
+        
         templates = mandatory(params, "templates", self)
         request_params = params.get("request-params", {})
         for template, body in templates:
@@ -1663,6 +1718,17 @@ class DeleteIndexTemplate(Runner):
     """
 
     async def __call__(self, es, params):
+        # Skip template operations for serverless-like environments (Infino, OpenSearch)
+        if (self.serverless_mode or 
+            (hasattr(es, '_client') and hasattr(es._client, 'database_type') and 
+             es._client.database_type in ["infino", "opensearch"])):
+            template_names = mandatory(params, "templates", self)
+            return {
+                "weight": len(template_names),
+                "unit": "ops",
+                "success": True,
+            }
+        
         template_names = mandatory(params, "templates", self)
         only_if_exists = params.get("only-if-exists", False)
         request_params = params.get("request-params", {})

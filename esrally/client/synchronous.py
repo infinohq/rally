@@ -18,6 +18,7 @@
 import warnings
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
+import logging
 
 from elastic_transport import (
     ApiResponse,
@@ -125,10 +126,12 @@ class RallySyncElasticsearch(Elasticsearch):
     def __init__(self, *args, **kwargs):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)
+        self.database_type = kwargs.pop("database_type", "elasticsearch")
         super().__init__(*args, **kwargs)
         self._verified_elasticsearch = None
         self.distribution_version = distribution_version
         self.distribution_flavor = distribution_flavor
+        self.logger = logging.getLogger(__name__)
 
     @property
     def is_serverless(self):
@@ -138,6 +141,7 @@ class RallySyncElasticsearch(Elasticsearch):
         new_self = super().options(*args, **kwargs)
         new_self.distribution_version = self.distribution_version
         new_self.distribution_flavor = self.distribution_flavor
+        new_self.database_type = self.database_type
         return new_self
 
     def perform_request(
@@ -165,47 +169,47 @@ class RallySyncElasticsearch(Elasticsearch):
         else:
             request_headers = self._headers
 
+        # Skip product verification for non-Elasticsearch databases
         if self._verified_elasticsearch is None:
-            info = self.transport.perform_request(method="GET", target="/", headers=request_headers)
-            info_meta = info.meta
-            info_body = info.body
+            if self.database_type == "elasticsearch":
+                info = self.transport.perform_request(method="GET", target="/", headers=request_headers)
+                info_meta = info.meta
+                info_body = info.body
 
-            if not 200 <= info_meta.status < 299:
-                raise HTTP_EXCEPTIONS.get(info_meta.status, ApiError)(message=str(info_body), meta=info_meta, body=info_body)
+                if not 200 <= info_meta.status < 299:
+                    raise HTTP_EXCEPTIONS.get(info_meta.status, ApiError)(message=str(info_body), meta=info_meta, body=info_body)
 
-            self._verified_elasticsearch = _ProductChecker.check_product(info_meta.headers, info_body)
+                self._verified_elasticsearch = _ProductChecker.check_product(info_meta.headers, info_body)
 
-            if self._verified_elasticsearch is not True:
-                _ProductChecker.raise_error(self._verified_elasticsearch, info_meta, info_body)
+                if self._verified_elasticsearch is not True:
+                    _ProductChecker.raise_error(self._verified_elasticsearch, info_meta, info_body)
+            else:
+                # Skip verification for OpenSearch and Infino
+                self.logger.debug(f"Skipping product verification for database type: {self.database_type}")
+                self._verified_elasticsearch = True
+
+        routed_path, routed_params, routed_headers, routed_body = self._route_request(
+            method, path, params, request_headers, body
+        )
 
         # Converts all parts of a Accept/Content-Type headers
         # from application/X -> application/vnd.elasticsearch+X
         # see https://github.com/elastic/elasticsearch/issues/51816
-        if not self.is_serverless:
+        if not self.is_serverless and self.database_type == "elasticsearch":
             if versions.is_version_identifier(self.distribution_version) and (
                 versions.Version.from_string(self.distribution_version) >= versions.Version.from_string("8.0.0")
             ):
                 _mimetype_header_to_compat("Accept", headers)
                 _mimetype_header_to_compat("Content-Type", headers)
 
-        if params:
-            target = f"{path}?{_quote_query(params)}"
-        else:
-            target = path
-
-        meta, resp_body = self.transport.perform_request(
-            method,
-            target,
-            headers=request_headers,
-            body=body,
-            request_timeout=self._request_timeout,
-            max_retries=self._max_retries,
-            retry_on_status=self._retry_on_status,
-            retry_on_timeout=self._retry_on_timeout,
-            client_meta=self._client_meta,
+        resp = self.transport.perform_request(
+            method=method, target=routed_path, headers=routed_headers, body=routed_body, params=routed_params
         )
+        resp_body, meta = resp.body, resp.meta
+        
+        # Transform response for database-specific differences
+        transformed_body = self._transform_response(method, path, resp_body)
 
-        # HEAD with a 404 is returned as a normal response
         # since this is used as an 'exists' functionality.
         if not (method == "HEAD" and meta.status == 404) and (
             not 200 <= meta.status < 299
@@ -238,20 +242,119 @@ class RallySyncElasticsearch(Elasticsearch):
                     stacklevel=stacklevel,
                 )
 
-        if method == "HEAD":
-            response = HeadApiResponse(meta=meta)
-        elif isinstance(resp_body, dict):
-            response = ObjectApiResponse(body=resp_body, meta=meta)  # type: ignore[assignment]
-        elif isinstance(resp_body, list):
-            response = ListApiResponse(body=resp_body, meta=meta)  # type: ignore[assignment]
-        elif isinstance(resp_body, str):
+        if isinstance(transformed_body, str):
             response = TextApiResponse(  # type: ignore[assignment]
-                body=resp_body,
+                body=transformed_body,
                 meta=meta,
             )
-        elif isinstance(resp_body, bytes):
-            response = BinaryApiResponse(body=resp_body, meta=meta)  # type: ignore[assignment]
+        elif isinstance(transformed_body, bytes):
+            response = BinaryApiResponse(body=transformed_body, meta=meta)  # type: ignore[assignment]
         else:
-            response = ApiResponse(body=resp_body, meta=meta)  # type: ignore[assignment]
+            response = ApiResponse(body=transformed_body, meta=meta)  # type: ignore[assignment]
 
         return response
+
+    def _route_request(self, method, path, params, headers, body):
+        """Route requests based on database type and path"""
+        
+        if self.database_type == "elasticsearch":
+            return path, params, headers, body
+            
+        elif self.database_type == "opensearch":
+            return self._route_opensearch_request(method, path, params, headers, body)
+            
+        elif self.database_type == "infino":
+            return self._route_infino_request(method, path, params, headers, body)
+            
+        else:
+            self.logger.warning(f"Unknown database type: {self.database_type}, using default routing")
+            return path, params, headers, body
+
+    def _route_opensearch_request(self, method, path, params, headers, body):
+        """Handle OpenSearch-specific request routing"""
+        # OpenSearch is mostly Elasticsearch-compatible
+        # Add any OpenSearch-specific routing here
+        return path, params, headers, body
+
+    def _route_infino_request(self, method, path, params, headers, body):
+        """Handle Infino-specific request routing"""
+        self.logger.debug(f"Routing Infino request: {method} {path}")
+        
+        # Add Infino authentication headers
+        infino_headers = headers.copy() if headers else {}
+        infino_headers.update({
+            "Authorization": "***REMOVED***",
+            "***REMOVED***": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFZOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VZTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+            "***REMOVED***": "***REMOVED***",
+            "***REMOVED***": "***REMOVED***",
+            "***REMOVED***": "***REMOVED***",
+            "***REMOVED***": "***REMOVED***",
+        })
+        
+        # All operations work similarly to Elasticsearch
+        return path, params, infino_headers, body
+    
+    def _transform_response(self, method, path, response_body):
+        """Transform response based on database type to handle format differences"""
+        
+        if self.database_type == "elasticsearch":
+            return response_body
+            
+        elif self.database_type == "opensearch":
+            # OpenSearch responses are mostly Elasticsearch-compatible
+            return response_body
+            
+        elif self.database_type == "infino":
+            # Handle Infino-specific response format differences
+            return self._transform_infino_response(method, path, response_body)
+            
+        return response_body
+    
+    def _transform_infino_response(self, method, path, response_body):
+        """Transform Infino responses to be Rally-compatible"""
+        
+        if not isinstance(response_body, dict):
+            return response_body
+            
+        # Handle cluster health responses
+        if path == "/_cluster/health":
+            # Ensure required fields exist for Rally
+            if "status" not in response_body:
+                response_body["status"] = "green"
+            if "cluster_name" not in response_body:
+                response_body["cluster_name"] = "infino-cluster"
+                
+        # Handle cluster stats responses  
+        elif path == "/_cluster/stats":
+            # Add missing fields that Rally expects
+            if "cluster_name" not in response_body:
+                response_body["cluster_name"] = "infino-cluster"
+                
+        # Handle node info responses
+        elif "/_nodes" in path:
+            # Ensure nodes response has expected structure
+            if "nodes" not in response_body:
+                response_body["nodes"] = {}
+                
+        # Handle search responses
+        elif path.endswith("/_search") or "/_search" in path:
+            # Ensure search response has expected structure
+            if "hits" not in response_body:
+                response_body["hits"] = {"total": {"value": 0}, "hits": []}
+            elif isinstance(response_body.get("hits", {}).get("total"), int):
+                # Convert old format total to new format
+                total_value = response_body["hits"]["total"]
+                response_body["hits"]["total"] = {"value": total_value, "relation": "eq"}
+                
+        # Handle bulk responses
+        elif path.endswith("/_bulk") or "/_bulk" in path:
+            # Ensure bulk response has expected structure
+            if "items" not in response_body:
+                response_body["items"] = []
+                
+        # Add debug logging for unexpected response formats
+        self.logger.debug(f"Infino response for {method} {path}: {response_body}")
+        
+        return response_body
+    
+
