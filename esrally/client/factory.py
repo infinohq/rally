@@ -191,9 +191,13 @@ class EsClientFactory:
         # pylint: disable=import-outside-toplevel
         from esrally.client.synchronous import RallySyncElasticsearch
 
+        # Extract database_type from client options if provided
+        database_type = self.client_options.pop("database_type", "elasticsearch")
+
         return RallySyncElasticsearch(
             distribution_version=self.distribution_version,
             distribution_flavor=self.distribution_flavor,
+            database_type=database_type,
             hosts=self.hosts,
             ssl_context=self.ssl_context,
             **self.client_options,
