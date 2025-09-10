@@ -202,6 +202,13 @@ class RallySyncElasticsearch(Elasticsearch):
             ):
                 _mimetype_header_to_compat("Accept", routed_headers)
                 _mimetype_header_to_compat("Content-Type", routed_headers)
+        elif self.database_type == "opensearch":
+            # OpenSearch needs both Accept and Content-Type headers but not the Elasticsearch 8.x format
+            _mimetype_header_to_compat("Accept", routed_headers)
+            _mimetype_header_to_compat("Content-Type", routed_headers)
+        elif self.database_type == "infino":
+            # Infino needs Content-Type but not Accept headers, and not the Elasticsearch 8.x format
+            _mimetype_header_to_compat("Content-Type", routed_headers)
 
         # Handle params compatibility - newer elasticsearch-py doesn't accept params as kwarg
         if routed_params:
