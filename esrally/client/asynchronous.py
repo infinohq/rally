@@ -296,6 +296,7 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
     def __init__(self, *args, **kwargs):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)
+        database_type = kwargs.pop("database_type", "elasticsearch")
         super().__init__(*args, **kwargs)
         # skip verification at this point; we've already verified this earlier with the synchronous client.
         # The async client is used in the hot code path and we use customized overrides (such as that we don't
@@ -303,6 +304,7 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         self._verified_elasticsearch = True
         self.distribution_version = distribution_version
         self.distribution_flavor = distribution_flavor
+        self.database_type = database_type
 
         # some ILM method signatures changed in 'elasticsearch-py' 8.x,
         # so we override method(s) here to provide BWC for any custom
