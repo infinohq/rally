@@ -349,13 +349,20 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         # Converts all parts of a Accept/Content-Type headers
         # from application/X -> application/vnd.elasticsearch+X
         # see https://github.com/elastic/elasticsearch/issues/51816
-        # Not applicable to serverless
-        if not self.is_serverless:
+        # Only apply Elasticsearch 8.x headers for actual Elasticsearch, not OpenSearch/Infino
+        if not self.is_serverless and self.database_type == "elasticsearch":
             if versions.is_version_identifier(self.distribution_version) and (
                 versions.Version.from_string(self.distribution_version) >= versions.Version.from_string("8.0.0")
             ):
                 _mimetype_header_to_compat("Accept", request_headers)
                 _mimetype_header_to_compat("Content-Type", request_headers)
+        elif self.database_type == "opensearch":
+            # OpenSearch needs both Accept and Content-Type headers but not the Elasticsearch 8.x format
+            _mimetype_header_to_compat("Accept", request_headers)
+            _mimetype_header_to_compat("Content-Type", request_headers)
+        elif self.database_type == "infino":
+            # Infino needs Content-Type but not Accept headers, and not the Elasticsearch 8.x format
+            _mimetype_header_to_compat("Content-Type", request_headers)
 
         if params:
             target = f"{path}?{_quote_query(params)}"
