@@ -195,12 +195,13 @@ class RallySyncElasticsearch(Elasticsearch):
         # Converts all parts of a Accept/Content-Type headers
         # from application/X -> application/vnd.elasticsearch+X
         # see https://github.com/elastic/elasticsearch/issues/51816
+        # Only apply Elasticsearch 8.x headers for actual Elasticsearch, not OpenSearch/Infino
         if not self.is_serverless and self.database_type == "elasticsearch":
             if versions.is_version_identifier(self.distribution_version) and (
                 versions.Version.from_string(self.distribution_version) >= versions.Version.from_string("8.0.0")
             ):
-                _mimetype_header_to_compat("Accept", headers)
-                _mimetype_header_to_compat("Content-Type", headers)
+                _mimetype_header_to_compat("Accept", routed_headers)
+                _mimetype_header_to_compat("Content-Type", routed_headers)
 
         # Handle params compatibility - newer elasticsearch-py doesn't accept params as kwarg
         if routed_params:

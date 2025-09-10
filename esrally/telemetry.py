@@ -1822,13 +1822,23 @@ class ClusterEnvironmentInfo(InternalTelemetryDevice):
         except BaseException:
             self.logger.exception("Could not retrieve cluster version info")
             return
-        distribution_flavor = client_info["version"].get("build_flavor", "oss")
+        
+        # Handle different response formats from different databases
+        if hasattr(client_info, 'body') and isinstance(client_info.body, dict):
+            version_info = client_info.body.get("version", {})
+        elif isinstance(client_info, dict) and "version" in client_info:
+            version_info = client_info["version"]
+        else:
+            # Fallback for unexpected response formats
+            version_info = {}
+            
+        distribution_flavor = version_info.get("build_flavor", "oss")
         # serverless returns dummy build hash which gets overridden when running with operator privileges
-        revision = client_info["version"].get("build_hash", distribution_flavor)
+        revision = version_info.get("build_hash", distribution_flavor)
         if self.revision_override:
             revision = self.revision_override
         # if version number is not available default to build flavor
-        distribution_version = client_info["version"].get("number", distribution_flavor)
+        distribution_version = version_info.get("number", distribution_flavor)
         # overwrite static serverless version number
         if versions.is_serverless(distribution_flavor):
             distribution_version = "serverless"
@@ -1864,13 +1874,32 @@ class ExternalEnvironmentInfo(InternalTelemetryDevice):
 
     # noinspection PyBroadException
     def on_benchmark_start(self):
+        # Skip nodes stats/info for Infino as it doesn't support these operations
+        if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+            self.logger.info("Skipping nodes stats and info collection for Infino database")
+            return
+            
         try:
-            nodes_stats = self.client.nodes.stats(metric="_all")["nodes"].values()
+            nodes_stats_response = self.client.nodes.stats(metric="_all")
+            # Handle different response formats
+            if hasattr(nodes_stats_response, 'body') and isinstance(nodes_stats_response.body, dict):
+                nodes_stats = nodes_stats_response.body.get("nodes", {}).values()
+            elif isinstance(nodes_stats_response, dict) and "nodes" in nodes_stats_response:
+                nodes_stats = nodes_stats_response["nodes"].values()
+            else:
+                nodes_stats = []
         except BaseException:
             self.logger.exception("Could not retrieve nodes stats")
             nodes_stats = []
         try:
-            nodes_info = self.client.nodes.info(node_id="_all")["nodes"].values()
+            nodes_info_response = self.client.nodes.info(node_id="_all")
+            # Handle different response formats
+            if hasattr(nodes_info_response, 'body') and isinstance(nodes_info_response.body, dict):
+                nodes_info = nodes_info_response.body.get("nodes", {}).values()
+            elif isinstance(nodes_info_response, dict) and "nodes" in nodes_info_response:
+                nodes_info = nodes_info_response["nodes"].values()
+            else:
+                nodes_info = []
         except BaseException:
             self.logger.exception("Could not retrieve nodes info")
             nodes_info = []
