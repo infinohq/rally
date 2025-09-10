@@ -339,6 +339,14 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                     headers["content-type"] = "application/json"
                 if headers.get("accept") is None:
                     headers["accept"] = "application/json"
+        
+        # For non-Elasticsearch databases, ensure we never apply Elasticsearch 8.x headers
+        if self.database_type in ["opensearch", "infino"]:
+            if headers is None:
+                headers = {}
+            headers["content-type"] = "application/json"
+            if self.database_type == "opensearch":
+                headers["accept"] = "application/json"
 
         if headers:
             request_headers = self._headers.copy()
