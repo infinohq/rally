@@ -357,12 +357,17 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 _mimetype_header_to_compat("Accept", request_headers)
                 _mimetype_header_to_compat("Content-Type", request_headers)
         elif self.database_type == "opensearch":
-            # OpenSearch needs both Accept and Content-Type headers but not the Elasticsearch 8.x format
-            _mimetype_header_to_compat("Accept", request_headers)
-            _mimetype_header_to_compat("Content-Type", request_headers)
+            # OpenSearch needs standard headers, not the Elasticsearch 8.x format
+            # Just ensure the headers are set to standard values
+            if "content-type" not in request_headers:
+                request_headers["content-type"] = "application/json"
+            if "accept" not in request_headers:
+                request_headers["accept"] = "application/json"
         elif self.database_type == "infino":
-            # Infino needs Content-Type but not Accept headers, and not the Elasticsearch 8.x format
-            _mimetype_header_to_compat("Content-Type", request_headers)
+            # Infino needs standard headers, not the Elasticsearch 8.x format
+            # Just ensure Content-Type is set to standard value (no Accept header)
+            if "content-type" not in request_headers:
+                request_headers["content-type"] = "application/json"
 
         if params:
             target = f"{path}?{_quote_query(params)}"
