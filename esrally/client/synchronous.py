@@ -202,8 +202,18 @@ class RallySyncElasticsearch(Elasticsearch):
                 _mimetype_header_to_compat("Accept", headers)
                 _mimetype_header_to_compat("Content-Type", headers)
 
+        # Handle params compatibility - newer elasticsearch-py doesn't accept params as kwarg
+        if routed_params:
+            # Merge params into the target URL
+            from urllib.parse import urlencode
+            param_string = urlencode(routed_params)
+            if '?' in routed_path:
+                routed_path = f"{routed_path}&{param_string}"
+            else:
+                routed_path = f"{routed_path}?{param_string}"
+        
         resp = self.transport.perform_request(
-            method=method, target=routed_path, headers=routed_headers, body=routed_body, params=routed_params
+            method=method, target=routed_path, headers=routed_headers, body=routed_body
         )
         resp_body, meta = resp.body, resp.meta
         
