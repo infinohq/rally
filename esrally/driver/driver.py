@@ -351,7 +351,18 @@ class DriverActor(actor.RallyActor):
         return self.createActor(TrackPreparationActor, targetActorRequirements=self._requirements(host))
 
     def _after_track_prepared(self):
-        cluster_version = self.cluster_details["version"] if self.cluster_details else {}
+        # Handle different response formats from different databases
+        if self.cluster_details:
+            if isinstance(self.cluster_details, dict) and "version" in self.cluster_details:
+                cluster_version = self.cluster_details["version"]
+            elif hasattr(self.cluster_details, 'body') and isinstance(self.cluster_details.body, dict):
+                cluster_version = self.cluster_details.body.get("version", {})
+            else:
+                # Fallback for unexpected response formats
+                cluster_version = {}
+        else:
+            cluster_version = {}
+            
         # manually compiled versions don't expose build_flavor but Rally expects a value in telemetry devices
         # we should default to trial/basic, but let's default to oss for now to avoid breaking the charts
         build_flavor = cluster_version.get("build_flavor", "oss")
