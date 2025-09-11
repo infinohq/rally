@@ -732,6 +732,11 @@ class ShardStatsRecorder:
         """
         Collect node-stats?level=shards and push to metrics store.
         """
+        # Skip shard stats collection for Infino as it doesn't support /_nodes/stats
+        if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+            self.logger.info("Skipping shard stats collection for Infino database")
+            return
+            
         # pylint: disable=import-outside-toplevel
         import elasticsearch
 
@@ -952,6 +957,11 @@ class NodeStatsRecorder:
         return flatten_stats_fields(prefix="fs", stats=node_stats.get("fs"))
 
     def sample(self):
+        # Skip node stats collection for Infino as it doesn't support /_nodes/stats
+        if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+            logging.getLogger(__name__).info("Skipping node stats collection for Infino database")
+            return {}
+            
         # pylint: disable=import-outside-toplevel
         import elasticsearch
 
@@ -1612,6 +1622,12 @@ class IngestPipelineStats(InternalTelemetryDevice):
 
         summaries = {}
         for cluster_name in self.specified_cluster_names:
+            # Skip ingest stats collection for Infino as it doesn't support /_nodes/stats
+            if hasattr(self.clients[cluster_name], 'database_type') and self.clients[cluster_name].database_type == "infino":
+                self.logger.info(f"Skipping ingest pipeline stats collection for Infino database on cluster [{cluster_name}]")
+                summaries[cluster_name] = {}
+                continue
+                
             try:
                 ingest_stats = self.clients[cluster_name].nodes.stats(metric="ingest")
             except elasticsearch.TransportError:
@@ -1982,6 +1998,12 @@ class JvmStatsSummary(InternalTelemetryDevice):
     def jvm_stats(self):
         self.logger.debug("Gathering JVM stats")
         jvm_stats = {}
+        
+        # Skip JVM stats collection for Infino as it doesn't support /_nodes/stats
+        if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+            self.logger.info("Skipping JVM stats collection for Infino database")
+            return jvm_stats
+        
         # pylint: disable=import-outside-toplevel
         import elasticsearch
 
