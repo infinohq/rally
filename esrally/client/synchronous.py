@@ -241,6 +241,13 @@ class RallySyncElasticsearch(Elasticsearch):
         # Transform response for database-specific differences
         transformed_body = self._transform_response(method, path, resp_body)
 
+        # Handle Infino-specific error cases
+        if self.database_type == "infino" and method == "DELETE" and meta.status == 404:
+            # Infino returns 404 for deleting non-existent indexes, but Rally expects this to succeed
+            # Transform this into a successful response
+            transformed_body = {"acknowledged": True}
+            meta.status = 200
+        
         # since this is used as an 'exists' functionality.
         if not (method == "HEAD" and meta.status == 404) and (
             not 200 <= meta.status < 299
@@ -322,6 +329,13 @@ class RallySyncElasticsearch(Elasticsearch):
             "x-infino-username": "admin",
         })
         
+        # Handle Infino-specific operations that differ from Elasticsearch
+        if method == "DELETE" and path.startswith("/"):
+            # For delete operations, Infino returns 404 for non-existent indexes
+            # Rally expects this to be treated as success (idempotent delete)
+            # We'll handle this in the response transformation
+            pass
+            
         # All operations work similarly to Elasticsearch
         return path, params, infino_headers, body
     
