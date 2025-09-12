@@ -1358,18 +1358,33 @@ class ClusterHealth(Runner):
         result = await es.cluster.health(**api_kwargs)
         cluster_status = result["status"]
         relocating_shards = result["relocating_shards"]
+        # Detect Infino and accept YELLOW as healthy to avoid endless retries
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+        if is_infino:
+            effective_expected_status = str(ClusterHealthStatus.YELLOW)
+            success = (
+                status(cluster_status) >= ClusterHealthStatus.YELLOW and relocating_shards <= expected_relocating_shards
+            )
+        else:
+            effective_expected_status = expected_cluster_status
+            success = (
+                status(cluster_status) >= status(expected_cluster_status) and relocating_shards <= expected_relocating_shards
+            )
 
         result = {
             "weight": 1,
             "unit": "ops",
-            "success": status(cluster_status) >= status(expected_cluster_status) and relocating_shards <= expected_relocating_shards,
+            "success": success,
             "cluster-status": cluster_status,
             "relocating-shards": relocating_shards,
         }
         self.logger.info(
             "%s: expected status=[%s], actual status=[%s], relocating shards=[%d], success=[%s].",
             repr(self),
-            expected_cluster_status,
+            effective_expected_status,
             cluster_status,
             relocating_shards,
             result["success"],

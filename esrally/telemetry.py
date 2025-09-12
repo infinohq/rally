@@ -2363,6 +2363,10 @@ class MasterNodeStats(InternalTelemetryDevice):
         self.sampler = None
 
     def on_benchmark_start(self):
+        # Skip master node stats for Infino as it doesn't support these cluster state APIs
+        if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+            self.logger.info("Skipping master node stats collection for Infino database")
+            return
         recorder = MasterNodeStatsRecorder(
             self.client,
             self.metrics_store,
