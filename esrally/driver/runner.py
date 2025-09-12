@@ -1418,6 +1418,7 @@ class CreateIndex(Runner):
     async def __call__(self, es, params):
         indices = mandatory(params, "indices", self)
         api_kwargs = self._default_kw_params(params)
+
         ## ignore invalid entries rather than erroring
         for term in ["index", "body"]:
             api_kwargs.pop(term, None)
