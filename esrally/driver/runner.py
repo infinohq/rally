@@ -36,6 +36,7 @@ import ijson
 
 from esrally import exceptions, track, types
 from esrally.utils import convert
+from esrally.client.context import RequestContextHolder
 from esrally.utils.versions import Version
 
 # Mapping from operation type to specific runner
@@ -744,6 +745,31 @@ class IndicesStats(Runner):
         return str(v) if v is not None else None
 
     async def __call__(self, es, params):
+        # Avoid any HTTP calls for Infino
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+        if is_infino:
+            condition = params.get("condition")
+            if condition:
+                path = mandatory(condition, "path", repr(self))
+                expected_value = mandatory(condition, "expected-value", repr(self))
+                # No backend call; actual value unknown
+                actual_value = None
+                return {
+                    "weight": 1,
+                    "unit": "ops",
+                    "condition": {
+                        "path": path,
+                        "actual-value": self._safe_string(actual_value),
+                        "expected-value": self._safe_string(expected_value),
+                    },
+                    "success": False,
+                }
+            else:
+                return {"weight": 1, "unit": "ops", "success": True}
+
         api_kwargs = self._default_kw_params(params)
         index = api_kwargs.pop("index", "_all")
         condition = params.get("condition")
@@ -761,7 +787,6 @@ class IndicesStats(Runner):
                     "actual-value": self._safe_string(actual_value),
                     "expected-value": self._safe_string(expected_value),
                 },
-                # currently we only support "==" as a predicate but that might change in the future
                 "success": actual_value == expected_value,
             }
         else:
@@ -1470,6 +1495,9 @@ class DeleteIndex(Runner):
 
         # For Infino, do not call the cluster at all for delete-index. Treat as a successful no-op.
         if is_infino:
+            # Ensure request timing is set for the driver even though we skip any HTTP calls
+            RequestContextHolder.on_request_start()
+            RequestContextHolder.on_request_end()
             self.logger.info(
                 "[Infino] Skipping delete-index calls (no HEAD/DELETE). Treating as successful no-op for indices: %s",
                 indices,
@@ -1533,6 +1561,9 @@ class DeleteDataStream(Runner):
 
         # For Infino, do not call the cluster at all for delete-data-stream. Treat as a successful no-op.
         if is_infino:
+            # Ensure request timing is set for the driver even though we skip any HTTP calls
+            RequestContextHolder.on_request_start()
+            RequestContextHolder.on_request_end()
             self.logger.info(
                 "[Infino] Skipping delete-data-stream calls (no HEAD/DELETE). Treating as successful no-op for data streams: %s",
                 data_streams,

@@ -2103,38 +2103,9 @@ class IndexStats(InternalTelemetryDevice):
     def index_stats(self):
         # noinspection PyBroadException
         try:
-            # For Infino, use _cat/indices and synthesize a minimal stats structure.
+            # For Infino, avoid any HTTP calls and return a synthesized minimal stats structure.
             if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
-                self.logger.info("Using _cat/indices for Infino index stats")
-                # Request JSON with byte units to ease parsing
-                try:
-                    cat_resp = self.client.cat.indices(format="json", bytes="b")
-                    # elasticsearch-py 8.x returns an ApiResponse with `.body`
-                    cat_indices = getattr(cat_resp, 'body', cat_resp)
-                except Exception:
-                    # Some client versions return text; fallback to raw request
-                    resp = self.client.perform_request(method="GET", path="/_cat/indices", params={"format": "json", "bytes": "b"})
-                    cat_indices = resp.body if hasattr(resp, 'body') else resp
-
-                # Normalize to list of dicts
-                if isinstance(cat_indices, str):
-                    import json as _json
-                    cat_indices = _json.loads(cat_indices)
-
-                def _parse_bytes(v):
-                    try:
-                        return int(v)
-                    except Exception:
-                        m = re.search(r"(\d+)", str(v))
-                        return int(m.group(1)) if m else 0
-
-                total_store_size = 0
-                for idx in cat_indices or []:
-                    # OpenSearch-compatible key is 'store.size'
-                    size_val = idx.get('store.size') or idx.get('store_size') or 0
-                    total_store_size += _parse_bytes(size_val)
-
-                # Build a minimal ES index stats-like structure Rally expects
+                self.logger.info("Skipping index stats HTTP calls for Infino; returning synthesized stats")
                 stats = {
                     "_all": {
                         "primaries": {
@@ -2167,8 +2138,8 @@ class IndexStats(InternalTelemetryDevice):
                         },
                         "total": {
                             "store": {
-                                "size_in_bytes": total_store_size,
-                                "total_data_set_size_in_bytes": total_store_size,
+                                "size_in_bytes": 0,
+                                "total_data_set_size_in_bytes": 0,
                             }
                         },
                     },
