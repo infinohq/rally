@@ -305,6 +305,7 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         self.distribution_version = distribution_version
         self.distribution_flavor = distribution_flavor
         self.database_type = database_type
+        self.logger = logging.getLogger(__name__)
 
         # some ILM method signatures changed in 'elasticsearch-py' 8.x,
         # so we override method(s) here to provide BWC for any custom
