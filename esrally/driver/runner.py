@@ -1462,6 +1462,24 @@ class DeleteIndex(Runner):
         only_if_exists = params.get("only-if-exists", False)
         request_params = params.get("request-params", {})
 
+        # Robust Infino detection (async client exposes database_type directly)
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+
+        # For Infino, do not call the cluster at all for delete-index. Treat as a successful no-op.
+        if is_infino:
+            self.logger.info(
+                "[Infino] Skipping delete-index calls (no HEAD/DELETE). Treating as successful no-op for indices: %s",
+                indices,
+            )
+            return {
+                "weight": len(indices),
+                "unit": "ops",
+                "success": True,
+            }
+
         # bypass cluster settings access for serverless
         prior_destructive_setting = None
         if not self.serverless_mode or self.serverless_operator:
@@ -1472,10 +1490,16 @@ class DeleteIndex(Runner):
                 if not only_if_exists:
                     await es.indices.delete(index=index_name, ignore=[404], params=request_params)
                     ops += 1
-                elif only_if_exists and await es.indices.exists(index=index_name):
-                    self.logger.info("Index [%s] already exists. Deleting it.", index_name)
-                    await es.indices.delete(index=index_name, params=request_params)
-                    ops += 1
+                elif only_if_exists:
+                    if is_infino:
+                        # Infino does not support HEAD index existence checks; skip exists() and delete with ignore=[404]
+                        self.logger.info("[Infino] Skipping HEAD exists for index [%s]; deleting with ignore=[404]", index_name)
+                        await es.indices.delete(index=index_name, ignore=[404], params=request_params)
+                        ops += 1
+                    elif await es.indices.exists(index=index_name):
+                        self.logger.info("Index [%s] already exists. Deleting it.", index_name)
+                        await es.indices.delete(index=index_name, params=request_params)
+                        ops += 1
         finally:
             if not self.serverless_mode or self.serverless_operator:
                 await set_destructive_requires_name(es, prior_destructive_setting)
@@ -1501,14 +1525,37 @@ class DeleteDataStream(Runner):
         only_if_exists = mandatory(params, "only-if-exists", self)
         request_params = mandatory(params, "request-params", self)
 
+        # Robust Infino detection
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+
+        # For Infino, do not call the cluster at all for delete-data-stream. Treat as a successful no-op.
+        if is_infino:
+            self.logger.info(
+                "[Infino] Skipping delete-data-stream calls (no HEAD/DELETE). Treating as successful no-op for data streams: %s",
+                data_streams,
+            )
+            return {
+                "weight": len(data_streams),
+                "unit": "ops",
+                "success": True,
+            }
+
         for data_stream in data_streams:
             if not only_if_exists:
                 await es.indices.delete_data_stream(name=data_stream, ignore=[404], params=request_params)
                 ops += 1
-            elif only_if_exists and await es.indices.exists(index=data_stream):
-                self.logger.info("Data stream [%s] already exists. Deleting it.", data_stream)
-                await es.indices.delete_data_stream(name=data_stream, params=request_params)
-                ops += 1
+            elif only_if_exists:
+                if is_infino:
+                    self.logger.info("[Infino] Skipping HEAD exists for data stream [%s]; deleting with ignore=[404]", data_stream)
+                    await es.indices.delete_data_stream(name=data_stream, ignore=[404], params=request_params)
+                    ops += 1
+                elif await es.indices.exists(index=data_stream):
+                    self.logger.info("Data stream [%s] already exists. Deleting it.", data_stream)
+                    await es.indices.delete_data_stream(name=data_stream, params=request_params)
+                    ops += 1
 
         return {
             "weight": ops,
