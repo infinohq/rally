@@ -2108,7 +2108,9 @@ class IndexStats(InternalTelemetryDevice):
                 self.logger.info("Using _cat/indices for Infino index stats")
                 # Request JSON with byte units to ease parsing
                 try:
-                    cat_indices = self.client.cat.indices(format="json", bytes="b")
+                    cat_resp = self.client.cat.indices(format="json", bytes="b")
+                    # elasticsearch-py 8.x returns an ApiResponse with `.body`
+                    cat_indices = getattr(cat_resp, 'body', cat_resp)
                 except Exception:
                     # Some client versions return text; fallback to raw request
                     resp = self.client.perform_request(method="GET", path="/_cat/indices", params={"format": "json", "bytes": "b"})
