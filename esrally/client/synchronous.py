@@ -19,6 +19,7 @@ import warnings
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
 import logging
+import json
 
 from elastic_transport import (
     ApiResponse,
@@ -277,6 +278,15 @@ class RallySyncElasticsearch(Elasticsearch):
                     raise e
             else:
                 raise e
+        
+        # If Infino returns JSON as a string, parse it so Rally can index into it
+        if self.database_type == "infino" and isinstance(resp_body, str):
+            try:
+                parsed = json.loads(resp_body)
+                resp_body = parsed
+            except Exception:
+                # Leave as string if not valid JSON
+                pass
         
         # Transform response for database-specific differences
         transformed_body = self._transform_response(method, path, resp_body)

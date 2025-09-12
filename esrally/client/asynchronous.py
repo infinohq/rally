@@ -414,6 +414,14 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             client_meta=self._client_meta,
         )
 
+        # If Infino returns JSON as a string, parse it so Rally can index into it
+        if self.database_type == "infino" and isinstance(resp_body, str):
+            try:
+                resp_body = json.loads(resp_body)
+            except Exception:
+                # Leave as string if not valid JSON
+                pass
+
         # HEAD with a 404 is returned as a normal response
         # since this is used as an 'exists' functionality.
         if not (method == "HEAD" and meta.status == 404) and (
