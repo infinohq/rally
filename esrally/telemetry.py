@@ -17,6 +17,7 @@
 
 import collections
 import fnmatch
+import re
 import logging
 import os
 import threading
@@ -2102,6 +2103,78 @@ class IndexStats(InternalTelemetryDevice):
     def index_stats(self):
         # noinspection PyBroadException
         try:
+            # For Infino, use _cat/indices and synthesize a minimal stats structure.
+            if hasattr(self.client, 'database_type') and self.client.database_type == "infino":
+                self.logger.info("Using _cat/indices for Infino index stats")
+                # Request JSON with byte units to ease parsing
+                try:
+                    cat_indices = self.client.cat.indices(format="json", bytes="b")
+                except Exception:
+                    # Some client versions return text; fallback to raw request
+                    resp = self.client.perform_request(method="GET", path="/_cat/indices", params={"format": "json", "bytes": "b"})
+                    cat_indices = resp.body if hasattr(resp, 'body') else resp
+
+                # Normalize to list of dicts
+                if isinstance(cat_indices, str):
+                    import json as _json
+                    cat_indices = _json.loads(cat_indices)
+
+                def _parse_bytes(v):
+                    try:
+                        return int(v)
+                    except Exception:
+                        m = re.search(r"(\d+)", str(v))
+                        return int(m.group(1)) if m else 0
+
+                total_store_size = 0
+                for idx in cat_indices or []:
+                    # OpenSearch-compatible key is 'store.size'
+                    size_val = idx.get('store.size') or idx.get('store_size') or 0
+                    total_store_size += _parse_bytes(size_val)
+
+                # Build a minimal ES index stats-like structure Rally expects
+                stats = {
+                    "_all": {
+                        "primaries": {
+                            "segments": {
+                                "count": 0,
+                                "memory_in_bytes": 0,
+                                "doc_values_memory_in_bytes": 0,
+                                "stored_fields_memory_in_bytes": 0,
+                                "terms_memory_in_bytes": 0,
+                                "norms_memory_in_bytes": 0,
+                                "points_memory_in_bytes": 0,
+                            },
+                            "merges": {
+                                "total_time_in_millis": 0,
+                                "total_throttled_time_in_millis": 0,
+                                "total": 0,
+                            },
+                            "indexing": {
+                                "index_time_in_millis": 0,
+                                "throttle_time_in_millis": 0,
+                            },
+                            "refresh": {
+                                "total_time_in_millis": 0,
+                                "total": 0,
+                            },
+                            "flush": {
+                                "total_time_in_millis": 0,
+                                "total": 0,
+                            },
+                        },
+                        "total": {
+                            "store": {
+                                "size_in_bytes": total_store_size,
+                                "total_data_set_size_in_bytes": total_store_size,
+                            }
+                        },
+                    },
+                    "indices": {},
+                }
+                return stats
+
+            # Default behavior for Elasticsearch/OpenSearch
             return self.client.indices.stats(metric="_all", level="shards")
         except BaseException:
             self.logger.exception("Could not retrieve index stats.")
