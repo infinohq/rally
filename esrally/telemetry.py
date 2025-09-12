@@ -16,6 +16,7 @@
 # under the License.
 
 import collections
+import json
 import fnmatch
 import re
 import logging
@@ -1841,14 +1842,28 @@ class ClusterEnvironmentInfo(InternalTelemetryDevice):
             return
         
         # Handle different response formats from different databases
-        if hasattr(client_info, 'body') and isinstance(client_info.body, dict):
-            version_info = client_info.body.get("version", {})
-        elif isinstance(client_info, dict) and "version" in client_info:
-            version_info = client_info["version"]
+        if hasattr(client_info, 'body'):
+            body = client_info.body
+            # Parse JSON string bodies first
+            if isinstance(body, str):
+                try:
+                    body = json.loads(body)
+                except Exception:
+                    body = {}
+            if isinstance(body, dict):
+                version_info = body.get("version", {})
+            else:
+                version_info = {}
+        elif isinstance(client_info, dict):
+            version_info = client_info.get("version", {})
         else:
             # Fallback for unexpected response formats
             version_info = {}
-            
+
+        # Normalize version_info if it's a string (e.g., Infino ping returns a simple version string)
+        if isinstance(version_info, str):
+            version_info = {"number": version_info}
+        
         distribution_flavor = version_info.get("build_flavor", "oss")
         # serverless returns dummy build hash which gets overridden when running with operator privileges
         revision = version_info.get("build_hash", distribution_flavor)
