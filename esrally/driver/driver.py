@@ -27,6 +27,7 @@ import queue
 import sys
 import threading
 import time
+import json
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
@@ -354,9 +355,35 @@ class DriverActor(actor.RallyActor):
         # Handle different response formats from different databases
         if self.cluster_details:
             if isinstance(self.cluster_details, dict) and "version" in self.cluster_details:
-                cluster_version = self.cluster_details["version"]
-            elif hasattr(self.cluster_details, 'body') and isinstance(self.cluster_details.body, dict):
-                cluster_version = self.cluster_details.body.get("version", {})
+                cv = self.cluster_details["version"]
+                if isinstance(cv, dict):
+                    cluster_version = cv
+                elif isinstance(cv, str):
+                    # Some targets (e.g., Infino ping) return version as a simple string
+                    cluster_version = {"number": cv}
+                else:
+                    cluster_version = {}
+            elif hasattr(self.cluster_details, 'body'):
+                body = self.cluster_details.body
+                # If body is a JSON string, parse it first
+                if isinstance(body, str):
+                    try:
+                        body = json.loads(body)
+                    except Exception:
+                        body = {}
+                if isinstance(body, dict):
+                    cluster_version = body.get("version", {})
+                    if isinstance(cluster_version, str):
+                        cluster_version = {"number": cluster_version}
+                else:
+                    cluster_version = {}
+            elif isinstance(self.cluster_details, str):
+                # Direct string response (e.g., JSON as string) – parse
+                try:
+                    parsed = json.loads(self.cluster_details)
+                    cluster_version = parsed.get("version", {}) if isinstance(parsed, dict) else {}
+                except Exception:
+                    cluster_version = {}
             else:
                 # Fallback for unexpected response formats
                 cluster_version = {}
