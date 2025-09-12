@@ -365,6 +365,11 @@ class RallySyncElasticsearch(Elasticsearch):
             # Rally expects this to be treated as success (idempotent delete)
             # We'll handle this in the response transformation
             pass
+        
+        # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
+        if method == "GET" and path.startswith("/_cluster/health/"):
+            self.logger.info("[INFINO DEBUG] Rewriting path '/_cluster/health/{index}' to '/_cluster/health'")
+            path = "/_cluster/health"
             
         # All operations work similarly to Elasticsearch
         return path, params, headers, body

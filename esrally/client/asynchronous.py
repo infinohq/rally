@@ -392,6 +392,11 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             if "content-type" not in request_headers:
                 request_headers["content-type"] = "application/json"
 
+        # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
+        if self.database_type == "infino" and method == "GET" and path.startswith("/_cluster/health/"):
+            self.logger.info("[INFINO DEBUG ASYNC] Rewriting path '/_cluster/health/{index}' to '/_cluster/health'")
+            path = "/_cluster/health"
+
         if params:
             target = f"{path}?{_quote_query(params)}"
         else:
