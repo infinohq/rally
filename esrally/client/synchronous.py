@@ -180,6 +180,7 @@ class RallySyncElasticsearch(Elasticsearch):
                     "x-infino-account-id": "000000000000",
                     "x-infino-thread-id": "rally-thread",
                     "x-infino-username": "admin",
+                    "x-opensearch-product-origin": "opensearch-dashboards",
                     "content-type": "application/json",
                 })
                 self.logger.info(f"[INFINO DEBUG] Infino headers added: {list(headers.keys())}")
