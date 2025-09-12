@@ -1434,9 +1434,10 @@ async def set_destructive_requires_name(es, value):
     :return: the prior setting, if any
     """
     # Skip cluster settings for Infino database as it doesn't support these APIs
-    if hasattr(es, '_client') and hasattr(es._client, 'database_type') and es._client.database_type == "infino":
+    # Detect Infino via the async client attribute directly and return early with no fallback.
+    if getattr(es, "database_type", None) == "infino":
         return None
-    
+ 
     all_settings = await es.cluster.get_settings(flat_settings=True)
     # If the setting was persistent or left as default, we consider resetting later with null sufficient
     prior_value = all_settings.get("transient").get("action.destructive_requires_name")
