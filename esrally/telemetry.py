@@ -2244,6 +2244,11 @@ class MlBucketProcessingTime(InternalTelemetryDevice):
         self.metrics_store = metrics_store
 
     def on_benchmark_stop(self):
+        # Skip ML telemetry for Infino database
+        if hasattr(self.client, 'database_type') and self.client.database_type == 'infino':
+            self.logger.info("Skipping ML bucket processing time collection for Infino database")
+            return
+            
         # pylint: disable=import-outside-toplevel
         import elasticsearch
 

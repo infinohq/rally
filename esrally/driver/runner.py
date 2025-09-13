@@ -763,35 +763,15 @@ class IndicesStats(Runner):
         return str(v) if v is not None else None
 
     async def __call__(self, es, params):
-        # Avoid any HTTP calls for Infino
-        is_infino = (
-            getattr(es, "database_type", None) == "infino"
-            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
-        )
-        if is_infino:
-            condition = params.get("condition")
-            if condition:
-                path = mandatory(condition, "path", repr(self))
-                expected_value = mandatory(condition, "expected-value", repr(self))
-                # For Infino, we assume the condition is met (e.g., merges.current = 0)
-                actual_value = expected_value
-                return {
-                    "weight": 1,
-                    "unit": "ops",
-                    "condition": {
-                        "path": path,
-                        "actual-value": self._safe_string(actual_value),
-                        "expected-value": self._safe_string(expected_value),
-                    },
-                    "success": True,
-                }
-            else:
-                return {"weight": 1, "unit": "ops", "success": True}
 
         api_kwargs = self._default_kw_params(params)
         index = api_kwargs.pop("index", "_all")
         condition = params.get("condition")
         response = await es.indices.stats(index=index, metric="_all", **api_kwargs)
+        
+        # Handle Infino's tuple response format (meta, body)
+        if isinstance(response, tuple) and len(response) == 2:
+            response = response[1]  # Use the body part of the tuple
         if condition:
             path = mandatory(condition, "path", repr(self))
             expected_value = mandatory(condition, "expected-value", repr(self))

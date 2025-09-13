@@ -367,13 +367,27 @@ def cluster_distribution_version(hosts, client_options, client_factory=EsClientF
 
     # wait_for_rest_layer  calls the Cluster Health API, which is not available for unprivileged users on Serverless
     # As a result, we need to call the info API first to know if we can call wait_for_rest_layer().
-    version = es.info()["version"]
+    info_response = es.info()
+    version = info_response.get("version") if info_response else None
 
-    version_build_flavor = version.get("build_flavor", "oss")
-    # if build hash is not available default to build flavor
-    version_build_hash = version.get("build_hash", version_build_flavor)
-    # if version number is not available default to build flavor
-    version_number = version.get("number", version_build_flavor)
+    # Handle Infino's version format (string instead of object) or missing version
+    if isinstance(version, str):
+        # Infino returns version as a string like "2025-06-30"
+        version_build_flavor = "infino"
+        version_build_hash = version
+        version_number = "8.0.0"  # Use a valid semantic version for Infino
+    elif version is None:
+        # Handle case where version info is missing (fallback for Infino or other databases)
+        version_build_flavor = "infino"
+        version_build_hash = "unknown"
+        version_number = "8.0.0"
+    else:
+        # Standard Elasticsearch version object
+        version_build_flavor = version.get("build_flavor", "oss")
+        # if build hash is not available default to build flavor
+        version_build_hash = version.get("build_hash", version_build_flavor)
+        # if version number is not available default to build flavor
+        version_number = version.get("number", version_build_flavor)
 
     # assume non-operator serverless privileges by default
     serverless_operator = False
