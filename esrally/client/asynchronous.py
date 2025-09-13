@@ -545,7 +545,8 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
         # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
         if not raw_response_requested:
-            if self.database_type == "infino" and isinstance(resp_body, str):
+            # Handle Infino's string response format - always parse JSON strings
+            if isinstance(resp_body, str):
                 try:
                     resp_body = json.loads(resp_body)
                 except Exception:

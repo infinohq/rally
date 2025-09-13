@@ -2228,12 +2228,15 @@ class GlobalStatsCalculator:
         unit = self.store.get_unit(metric_name)
         if values:
             flat_values = [w for v in values for w in v]
-            return {
-                "min": min(flat_values),
-                "median": statistics.median(flat_values),
-                "max": max(flat_values),
-                "unit": unit,
-            }
+            if flat_values:  # Check if flat_values is not empty
+                return {
+                    "min": min(flat_values),
+                    "median": statistics.median(flat_values),
+                    "max": max(flat_values),
+                    "unit": unit,
+                }
+            else:
+                return {}
         else:
             return {}
 

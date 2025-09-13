@@ -85,6 +85,18 @@ class _ProductChecker:
         """
 
         version = response.get("version", {})
+        
+        # Handle Infino's string version format
+        if isinstance(version, str):
+            # Convert Infino's date version (2025-06-30) to semantic version (2025.6.30)
+            import re
+            if re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', version):
+                date_parts = version.split('-')
+                semantic_version = f"{date_parts[0]}.{int(date_parts[1])}.{int(date_parts[2])}"
+                version = {"number": semantic_version, "build_flavor": "infino", "build_hash": "unknown"}
+            else:
+                version = {"number": "8.0.0", "build_flavor": "infino", "build_hash": "unknown"}
+        
         try:
             version_number = versions.Version.from_string(version.get("number", None))
         except TypeError:
@@ -205,6 +217,14 @@ class RallySyncElasticsearch(Elasticsearch):
                 info = self.transport.perform_request(method="GET", target="/", headers=request_headers)
                 info_meta = info.meta
                 info_body = info.body
+                
+                # Handle Infino's string response format - always parse JSON strings
+                if isinstance(info_body, str):
+                    import json
+                    try:
+                        info_body = json.loads(info_body)
+                    except json.JSONDecodeError:
+                        pass  # Keep as string if not valid JSON
 
                 if not 200 <= info_meta.status < 299:
                     raise HTTP_EXCEPTIONS.get(info_meta.status, ApiError)(message=str(info_body), meta=info_meta, body=info_body)
@@ -262,11 +282,40 @@ class RallySyncElasticsearch(Elasticsearch):
                 routed_path = f"{routed_path}?{param_string}"
         
         try:
-            resp = self.transport.perform_request(
-                method=method, target=routed_path, headers=routed_headers, body=routed_body
-            )
-            resp_body, meta = resp.body, resp.meta
+            self.logger.debug(f"INFINO REQUEST: About to execute {method} {routed_path}")
+            self.logger.debug(f"INFINO REQUEST: Headers being sent: {routed_headers}")
+            response = self.transport.perform_request(method=method, target=routed_path, params=routed_params, headers=routed_headers, body=routed_body)
+            response_body = response.body if hasattr(response, 'body') else response
+            
+            # Log successful responses for search operations
+            if "/_search" in routed_path:
+                self.logger.debug(f"INFINO SEARCH SUCCESS: {method} {routed_path}")
+                self.logger.debug(f"INFINO SEARCH RESPONSE TYPE: {type(response_body)}")
+                if isinstance(response_body, str) and len(response_body) < 500:
+                    self.logger.debug(f"INFINO SEARCH RESPONSE: {response_body}")
+            
+            # Transform response based on database type
+            transformed_body = self._transform_response(method, routed_path, response_body)
+            
+            if hasattr(response, 'body'):
+                response.body = transformed_body
+                return response
+            else:
+                return transformed_body
+                
         except Exception as e:
+            # Enhanced error logging for search operations
+            if "/_search" in routed_path:
+                self.logger.error(f"INFINO SEARCH FAILED: {method} {routed_path}")
+                self.logger.error(f"INFINO SEARCH ERROR: {str(e)}")
+                self.logger.error(f"INFINO SEARCH ERROR TYPE: {type(e)}")
+                if hasattr(e, 'status_code'):
+                    self.logger.error(f"INFINO SEARCH HTTP STATUS: {e.status_code}")
+                if hasattr(e, 'body'):
+                    self.logger.error(f"INFINO SEARCH ERROR BODY: {e.body}")
+            else:
+                self.logger.error(f"Request failed: {method} {routed_path} - {str(e)}")
+            
             # Handle Infino-specific errors that occur at transport level
             if self.database_type == "infino" and method == "DELETE":
                 # Check for various error types that indicate unauthorized/not found
@@ -285,75 +334,10 @@ class RallySyncElasticsearch(Elasticsearch):
                     fake_meta = SimpleNamespace()
                     fake_meta.status = 200
                     fake_meta.headers = {}
-                    resp_body = {"acknowledged": True}
-                    meta = fake_meta
-                else:
-                    raise e
-            else:
-                raise e
-        
-        # If Infino returns JSON as a string, parse it so Rally can index into it
-        if self.database_type == "infino" and isinstance(resp_body, str):
-            try:
-                parsed = json.loads(resp_body)
-                resp_body = parsed
-            except Exception:
-                # Leave as string if not valid JSON
-                pass
-        
-        # Transform response for database-specific differences
-        transformed_body = self._transform_response(method, path, resp_body)
-
-        # Handle Infino-specific error cases (backup in case some errors reach here)
-        if self.database_type == "infino" and method == "DELETE" and meta.status in [401, 404]:
-            # Infino returns 404/401 for deleting non-existent indexes, but Rally expects this to succeed
-            # Transform this into a successful response
-            transformed_body = {"acknowledged": True}
-            meta.status = 200
-        
-        # since this is used as an 'exists' functionality.
-        if not (method == "HEAD" and meta.status == 404) and (
-            not 200 <= meta.status < 299
-            and (self._ignore_status is DEFAULT or self._ignore_status is None or meta.status not in self._ignore_status)
-        ):
-            message = str(resp_body)
-
-            # If the response is an error response try parsing
-            # the raw Elasticsearch error before raising.
-            if isinstance(resp_body, dict):
-                try:
-                    error = resp_body.get("error", message)
-                    if isinstance(error, dict) and "type" in error:
-                        error = error["type"]
-                    message = error
-                except (ValueError, KeyError, TypeError):
-                    pass
-
-            raise HTTP_EXCEPTIONS.get(meta.status, ApiError)(message=message, meta=meta, body=resp_body)
-
-        # 'Warning' headers should be reraised as 'ElasticsearchWarning'
-        if "warning" in meta.headers:
-            warning_header = (meta.headers.get("warning") or "").strip()
-            warning_messages: Iterable[str] = _WARNING_RE.findall(warning_header) or (warning_header,)
-            stacklevel = warn_stacklevel()
-            for warning_message in warning_messages:
-                warnings.warn(
-                    warning_message,
-                    category=ElasticsearchWarning,
-                    stacklevel=stacklevel,
-                )
-
-        if isinstance(transformed_body, str):
-            response = TextApiResponse(  # type: ignore[assignment]
-                body=transformed_body,
-                meta=meta,
-            )
-        elif isinstance(transformed_body, bytes):
-            response = BinaryApiResponse(body=transformed_body, meta=meta)  # type: ignore[assignment]
-        else:
-            response = ApiResponse(body=transformed_body, meta=meta)  # type: ignore[assignment]
-
-        return response
+                    response_body = {"acknowledged": True}
+                    return response_body
+            
+            raise
 
     def _route_request(self, method, path, params, headers, body):
         """Route requests based on database type and path"""
@@ -379,7 +363,9 @@ class RallySyncElasticsearch(Elasticsearch):
 
     def _route_infino_request(self, method, path, params, headers, body):
         """Handle Infino-specific request routing"""
-        self.logger.debug(f"Routing Infino request: {method} {path}")
+        self.logger.debug(f"INFINO ROUTING: {method} {path}")
+        self.logger.debug(f"INFINO ROUTING PARAMS: {params}")
+        self.logger.debug(f"INFINO ROUTING HEADERS: {headers}")
         
         # Headers are already added in perform_request method, just pass them through
         # Handle Infino-specific operations that differ from Elasticsearch
@@ -391,14 +377,54 @@ class RallySyncElasticsearch(Elasticsearch):
         
         # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
         if method == "GET" and path.startswith("/_cluster/health/"):
+            self.logger.debug(f"INFINO ROUTING: Rewriting cluster health path from {path} to /_cluster/health")
             path = "/_cluster/health"
         
         # Infino only supports _cat/indices, not /_stats - intercept and handle in response transformation
         if method == "GET" and ("/_stats" in path):
             # Mark this request for special handling in response transformation
             # We'll return a fake response with the required merge stats
+            self.logger.debug(f"INFINO ROUTING: Stats request detected: {path}")
             pass
         
+        # Add debug logging for search operations and filter unsupported params
+        if "/_search" in path:
+            self.logger.debug(f"INFINO ROUTING: Search request detected: {method} {path}")
+            self.logger.debug(f"INFINO ROUTING: Search body: {body}")
+            self.logger.debug(f"INFINO ROUTING: Original search params: {params}")
+            
+            # Remove Elasticsearch-specific parameters that Infino doesn't support
+            if params:
+                unsupported_params = [
+                    'request_cache',  # Rally adds this for caching
+                    'preference',     # Elasticsearch routing preference
+                    'routing',        # Elasticsearch routing
+                    'scroll',         # Elasticsearch scroll context
+                    'scroll_id',      # Elasticsearch scroll ID
+                    'search_type',    # Elasticsearch search type
+                    'allow_partial_search_results',  # Elasticsearch partial results
+                    'batched_reduce_size',  # Elasticsearch batched reduce
+                    'pre_filter_shard_size',  # Elasticsearch pre-filter
+                    'max_concurrent_shard_requests',  # Elasticsearch concurrency
+                    'rest_total_hits_as_int',  # Elasticsearch total hits format
+                    'typed_keys',     # Elasticsearch typed keys
+                ]
+                
+                filtered_params = {}
+                removed_params = []
+                
+                for key, value in params.items():
+                    if key not in unsupported_params:
+                        filtered_params[key] = value
+                    else:
+                        removed_params.append(key)
+                
+                if removed_params:
+                    self.logger.debug(f"INFINO ROUTING: Removed unsupported params: {removed_params}")
+                
+                params = filtered_params
+                self.logger.debug(f"INFINO ROUTING: Filtered search params: {params}")
+            
         # Add timeout for bulk operations to prevent hanging
         if "/_bulk" in path and method == "POST":
             # Ensure we have reasonable timeouts for bulk operations
@@ -407,8 +433,11 @@ class RallySyncElasticsearch(Elasticsearch):
             # Add timeout parameter if not already set
             if "timeout" not in params:
                 params["timeout"] = "60s"
+            self.logger.debug(f"INFINO ROUTING: Bulk request with timeout: {params}")
             
         # All operations work similarly to Elasticsearch
+        self.logger.debug(f"INFINO ROUTING: Final routed request: {method} {path}")
+        self.logger.debug(f"INFINO ROUTING: Final params: {params}")
         return path, params, headers, body
     
     def _transform_response(self, method, path, response_body):
@@ -505,11 +534,11 @@ class RallySyncElasticsearch(Elasticsearch):
         elif "/_stats" in path and method == "GET":
             # Get real stats from Infino's _cat/indices API and transform to Rally format
             try:
-                # Make a request to _cat/indices to get actual stats
+                # Make a direct request to _cat/indices to avoid recursion
+                import urllib3
                 cat_resp = self.transport.perform_request(
                     method="GET", 
-                    target="/_cat/indices", 
-                    headers=request_headers
+                    target="/_cat/indices",
                 )
                 cat_data = cat_resp.body if hasattr(cat_resp, 'body') else cat_resp
                 
@@ -590,10 +619,12 @@ class RallySyncElasticsearch(Elasticsearch):
                         }
                     }
                 }
-                
-        # Add debug logging for unexpected response formats
-        self.logger.debug(f"Infino response for {method} {path}: {response_body}")
-        
-        return response_body
+            
+            # Return in the same format as async client (meta, body tuple)
+            from types import SimpleNamespace
+            fake_meta = SimpleNamespace()
+            fake_meta.status = 200
+            fake_meta.headers = {}
+            return fake_meta, response_body
     
 
