@@ -397,6 +397,14 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             self.logger.info("[INFINO DEBUG ASYNC] Rewriting path '/_cluster/health/{index}' to '/_cluster/health'")
             path = "/_cluster/health"
 
+        # Infino requires POST for bulk and NDJSON content type
+        if self.database_type == "infino" and "/_bulk" in path:
+            if method != "POST":
+                self.logger.info(f"[INFINO DEBUG ASYNC] Rewriting method {method} to POST for bulk endpoint {path}")
+                method = "POST"
+            # Bulk uses newline-delimited JSON
+            request_headers["content-type"] = "application/x-ndjson"
+
         if params:
             target = f"{path}?{_quote_query(params)}"
         else:
