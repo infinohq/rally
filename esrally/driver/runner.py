@@ -845,6 +845,30 @@ def parse(text: BytesIO, props: list[str], lists: list[str] = None, objects: lis
     :param objects: An optional list of property paths to flat JSON objects in the provided text.
     :return: A dict containing all properties, lists, and flat objects that have been found in the provided text.
     """
+    # If a dict is provided (e.g. client returned a fully parsed object), extract props directly
+    if isinstance(text, dict):
+        def _get_path(d, path):
+            cur = d
+            for p in path.split('.'):
+                if not isinstance(cur, dict) or p not in cur:
+                    return None
+                cur = cur[p]
+            return cur
+        parsed = {}
+        for p in props:
+            parsed[p] = _get_path(text, p)
+        # Minimal support for 'lists' and 'objects' when text is a dict
+        if lists:
+            for l in lists:
+                v = _get_path(text, l)
+                parsed[l] = True if isinstance(v, list) and len(v) == 0 else False
+        if objects:
+            for o in objects:
+                v = _get_path(text, o)
+                if isinstance(v, dict):
+                    parsed[o] = v
+        return parsed
+
     # Unwrap JSON-string bodies (e.g. '"{...}"') that some backends (Infino) return so ijson can parse the JSON object
     # This is safe for BytesIO objects and preserves behavior for normal JSON bodies.
     try:
