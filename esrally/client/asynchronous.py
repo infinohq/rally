@@ -21,6 +21,7 @@ import logging
 import warnings
 from collections.abc import Iterable, Mapping
 from typing import Any, Optional
+from io import BytesIO
 
 import aiohttp
 from aiohttp import BaseConnector, RequestInfo
@@ -331,6 +332,9 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
+        # Detect if Rally requested a raw response (used by bulk fast path)
+        ctx = RequestContextHolder.request_context.get({})
+        raw_response_requested = bool(ctx.get("raw_response"))
         # We need to ensure that we provide content-type and accept headers
         if body is not None:
             if headers is None:
@@ -422,13 +426,15 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             client_meta=self._client_meta,
         )
 
-        # If Infino returns JSON as a string, parse it so Rally can index into it
-        if self.database_type == "infino" and isinstance(resp_body, str):
-            try:
-                resp_body = json.loads(resp_body)
-            except Exception:
-                # Leave as string if not valid JSON
-                pass
+        # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
+        # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
+        if not raw_response_requested:
+            if self.database_type == "infino" and isinstance(resp_body, str):
+                try:
+                    resp_body = json.loads(resp_body)
+                except Exception:
+                    # Leave as string if not valid JSON
+                    pass
 
         # HEAD with a 404 is returned as a normal response
         # since this is used as an 'exists' functionality.
@@ -462,6 +468,19 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                     category=ElasticsearchWarning,
                     stacklevel=stacklevel,
                 )
+
+        # If Rally requested raw response, return a BytesIO of the raw body for fast-path parsing
+        if raw_response_requested:
+            if isinstance(resp_body, bytes):
+                raw_bytes = resp_body
+            elif isinstance(resp_body, str):
+                raw_bytes = resp_body.encode("utf-8")
+            else:
+                try:
+                    raw_bytes = json.dumps(resp_body).encode("utf-8")
+                except Exception:
+                    raw_bytes = str(resp_body).encode("utf-8")
+            return BytesIO(raw_bytes)  # type: ignore[return-value]
 
         if method == "HEAD":
             response = HeadApiResponse(meta=meta)
