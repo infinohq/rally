@@ -417,7 +417,7 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 # Get real stats from Infino's _cat/indices API
                 cat_meta, cat_body = await self.transport.perform_request(
                     method="GET",
-                    target="/_cat/indices?format=json",
+                    target="/_cat/indices",
                     headers=request_headers,
                     body=None,
                     request_timeout=self._request_timeout,

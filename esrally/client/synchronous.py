@@ -499,7 +499,7 @@ class RallySyncElasticsearch(Elasticsearch):
                 # Make a request to _cat/indices to get actual stats
                 cat_resp = self.transport.perform_request(
                     method="GET", 
-                    target="/_cat/indices?format=json", 
+                    target="/_cat/indices", 
                     headers=request_headers
                 )
                 cat_data = cat_resp.body if hasattr(cat_resp, 'body') else cat_resp
