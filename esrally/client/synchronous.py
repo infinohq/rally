@@ -383,6 +383,12 @@ class RallySyncElasticsearch(Elasticsearch):
         # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
         if method == "GET" and path.startswith("/_cluster/health/"):
             path = "/_cluster/health"
+        
+        # Infino only supports _cat/indices, not /_stats - intercept and handle in response transformation
+        if method == "GET" and ("/_stats" in path):
+            # Mark this request for special handling in response transformation
+            # We'll return a fake response with the required merge stats
+            pass
             
         # All operations work similarly to Elasticsearch
         return path, params, headers, body
@@ -444,6 +450,96 @@ class RallySyncElasticsearch(Elasticsearch):
             # Ensure bulk response has expected structure
             if "items" not in response_body:
                 response_body["items"] = []
+        
+        # Handle indices stats requests - Infino doesn't support /_stats, use _cat/indices instead
+        elif "/_stats" in path and method == "GET":
+            # Get real stats from Infino's _cat/indices API and transform to Rally format
+            try:
+                # Make a request to _cat/indices to get actual stats
+                cat_resp = self.transport.perform_request(
+                    method="GET", 
+                    target="/_cat/indices?format=json", 
+                    headers=request_headers
+                )
+                cat_data = cat_resp.body if hasattr(cat_resp, 'body') else cat_resp
+                
+                # Parse cat_data if it's a string
+                if isinstance(cat_data, str):
+                    import json
+                    cat_data = json.loads(cat_data)
+                
+                # Transform _cat/indices response to _stats format Rally expects
+                total_docs = 0
+                total_size_bytes = 0
+                
+                if isinstance(cat_data, list):
+                    for index_info in cat_data:
+                        # Sum up document counts and sizes
+                        docs_count = index_info.get('docs.count', '0')
+                        store_size = index_info.get('store.size', '0b')
+                        
+                        # Parse docs count
+                        try:
+                            total_docs += int(docs_count) if docs_count != '-' else 0
+                        except (ValueError, TypeError):
+                            pass
+                            
+                        # Parse store size (convert from human readable to bytes)
+                        try:
+                            if store_size.endswith('kb'):
+                                total_size_bytes += int(float(store_size[:-2]) * 1024)
+                            elif store_size.endswith('mb'):
+                                total_size_bytes += int(float(store_size[:-2]) * 1024 * 1024)
+                            elif store_size.endswith('gb'):
+                                total_size_bytes += int(float(store_size[:-2]) * 1024 * 1024 * 1024)
+                            elif store_size.endswith('b'):
+                                total_size_bytes += int(store_size[:-1])
+                            else:
+                                total_size_bytes += int(store_size) if store_size.isdigit() else 0
+                        except (ValueError, TypeError):
+                            pass
+                
+                # Return Rally-compatible stats with real data
+                response_body = {
+                    "_all": {
+                        "total": {
+                            "docs": {
+                                "count": total_docs,
+                                "deleted": 0
+                            },
+                            "store": {
+                                "size_in_bytes": total_size_bytes
+                            },
+                            "merges": {
+                                "current": 0,  # Infino doesn't expose merge info, safe to use 0
+                                "current_docs": 0,
+                                "current_size_in_bytes": 0,
+                                "total": 0,
+                                "total_time_in_millis": 0,
+                                "total_docs": 0,
+                                "total_size_in_bytes": 0
+                            }
+                        }
+                    }
+                }
+            except Exception as e:
+                # Fallback to basic stats if _cat/indices fails
+                self.logger.warning(f"Failed to get Infino stats via _cat/indices: {e}")
+                response_body = {
+                    "_all": {
+                        "total": {
+                            "merges": {
+                                "current": 0,
+                                "current_docs": 0,
+                                "current_size_in_bytes": 0,
+                                "total": 0,
+                                "total_time_in_millis": 0,
+                                "total_docs": 0,
+                                "total_size_in_bytes": 0
+                            }
+                        }
+                    }
+                }
                 
         # Add debug logging for unexpected response formats
         self.logger.debug(f"Infino response for {method} {path}: {response_body}")
