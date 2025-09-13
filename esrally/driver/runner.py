@@ -827,6 +827,25 @@ def parse(text: BytesIO, props: list[str], lists: list[str] = None, objects: lis
     :param objects: An optional list of property paths to flat JSON objects in the provided text.
     :return: A dict containing all properties, lists, and flat objects that have been found in the provided text.
     """
+    # Unwrap JSON-string bodies (e.g. '"{...}"') that some backends (Infino) return so ijson can parse the JSON object
+    # This is safe for BytesIO objects and preserves behavior for normal JSON bodies.
+    try:
+        if hasattr(text, "getvalue"):
+            raw = text.getvalue()
+            # Attempt to detect and unwrap a JSON-encoded string that itself contains a JSON document
+            try:
+                s = raw.decode("utf-8")
+                loaded = json.loads(s)
+                if isinstance(loaded, str) and loaded.lstrip().startswith(("{", "[")):
+                    # Replace 'text' with a new BytesIO containing the unwrapped JSON document
+                    text = BytesIO(loaded.encode("utf-8"))
+            except Exception:
+                # If any step fails, fall back to original BytesIO
+                pass
+    except Exception:
+        # Be conservative: never raise from helper, just fall through to normal parsing
+        pass
+
     text.seek(0)
     parser = ijson.parse(text)
     parsed = {}
@@ -1418,6 +1437,18 @@ class Refresh(Runner):
     """
 
     async def __call__(self, es, params):
+        # Infino does not implement the refresh API; treat as a successful no-op
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+        if is_infino:
+            # Ensure request timing is set even though no HTTP call is made
+            RequestContextHolder.on_request_start()
+            RequestContextHolder.on_request_end()
+            self.logger.info("[Infino] Skipping indices.refresh; treating as successful no-op.")
+            return {"success": True, "unit": "ops", "weight": 1}
+
         api_kwargs = self._default_kw_params(params)
         await es.indices.refresh(**api_kwargs)
 
