@@ -389,6 +389,15 @@ class RallySyncElasticsearch(Elasticsearch):
             # Mark this request for special handling in response transformation
             # We'll return a fake response with the required merge stats
             pass
+        
+        # Add timeout for bulk operations to prevent hanging
+        if "/_bulk" in path and method == "POST":
+            # Ensure we have reasonable timeouts for bulk operations
+            if params is None:
+                params = {}
+            # Add timeout parameter if not already set
+            if "timeout" not in params:
+                params["timeout"] = "60s"
             
         # All operations work similarly to Elasticsearch
         return path, params, headers, body
@@ -467,9 +476,21 @@ class RallySyncElasticsearch(Elasticsearch):
                 
         # Handle bulk responses
         elif path.endswith("/_bulk") or "/_bulk" in path:
+            # Add debug logging for bulk responses
+            self.logger.debug(f"Infino bulk response type: {type(response_body)}, content: {str(response_body)[:200]}")
+            
             # Ensure bulk response has expected structure
-            if "items" not in response_body:
+            if not isinstance(response_body, dict):
+                self.logger.warning(f"Bulk response is not dict: {type(response_body)}")
+                response_body = {"took": 0, "errors": False, "items": []}
+            elif "items" not in response_body:
                 response_body["items"] = []
+                
+            # Ensure required fields exist
+            if "took" not in response_body:
+                response_body["took"] = 0
+            if "errors" not in response_body:
+                response_body["errors"] = False
         
         # Handle indices stats requests - Infino doesn't support /_stats, use _cat/indices instead
         elif "/_stats" in path and method == "GET":

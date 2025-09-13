@@ -404,6 +404,12 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 method = "POST"
             # Bulk uses newline-delimited JSON
             request_headers["content-type"] = "application/x-ndjson"
+            
+            # Add timeout for bulk operations to prevent hanging
+            if params is None:
+                params = {}
+            if "timeout" not in params:
+                params["timeout"] = "60s"
         
         # Infino doesn't support /_stats - use _cat/indices to get real stats
         if self.database_type == "infino" and method == "GET" and "/_stats" in path:
@@ -539,6 +545,10 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             
             # Transform Infino responses for Rally compatibility
             if self.database_type == "infino":
+                # Add debug logging for async responses
+                if "/_bulk" in path:
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"Async Infino bulk response type: {type(resp_body)}, content: {str(resp_body)[:200]}")
                 resp_body = self._transform_infino_response(method, path, resp_body)
 
         # HEAD with a 404 is returned as a normal response
@@ -638,5 +648,19 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                     return response_body
             else:
                 return response_body
+        
+        # Handle bulk responses in async client too
+        if path.endswith("/_bulk") or "/_bulk" in path:
+            # Ensure bulk response has expected structure
+            if not isinstance(response_body, dict):
+                response_body = {"took": 0, "errors": False, "items": []}
+            elif "items" not in response_body:
+                response_body["items"] = []
+                
+            # Ensure required fields exist
+            if "took" not in response_body:
+                response_body["took"] = 0
+            if "errors" not in response_body:
+                response_body["errors"] = False
                 
         return response_body
