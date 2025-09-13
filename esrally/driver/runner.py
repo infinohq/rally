@@ -700,6 +700,17 @@ class ForceMerge(Runner):
     """
 
     async def __call__(self, es, params):
+        # Infino does not support force-merge; treat as a successful no-op
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+        if is_infino:
+            RequestContextHolder.on_request_start()
+            RequestContextHolder.on_request_end()
+            self.logger.info("[Infino] Skipping force-merge; treating as successful no-op.")
+            return {"success": True, "unit": "ops", "weight": 1}
+
         # pylint: disable=import-outside-toplevel
         import elasticsearch
 
