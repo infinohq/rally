@@ -625,6 +625,13 @@ class BulkIndex(Runner):
             bulk_success_count = 0
             # Reparse fully in case of errors - this will be slower
             parsed_response = json.loads(response.getvalue())
+            # Handle nested JSON-string bodies (e.g., '"{...}"') by decoding twice
+            if isinstance(parsed_response, str):
+                try:
+                    if parsed_response.lstrip().startswith(("{", "[")):
+                        parsed_response = json.loads(parsed_response)
+                except Exception:
+                    pass
             for item in parsed_response["items"]:
                 data = next(iter(item.values()))
                 if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
