@@ -173,7 +173,6 @@ class RallySyncElasticsearch(Elasticsearch):
                 headers["accept"] = "application/json"
             elif self.database_type == "infino":
                 # Add Infino authentication headers for ALL requests
-                self.logger.info(f"[INFINO DEBUG] Adding Infino auth headers for {method} request to {path}")
                 headers.update({
                     "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
                     "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFZOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VYTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
@@ -184,7 +183,6 @@ class RallySyncElasticsearch(Elasticsearch):
                     "x-opensearch-product-origin": "opensearch-dashboards",
                     "content-type": "application/json",
                 })
-                self.logger.info(f"[INFINO DEBUG] Infino headers added: {list(headers.keys())}")
 
         if headers:
             request_headers = self._headers.copy()
@@ -241,7 +239,6 @@ class RallySyncElasticsearch(Elasticsearch):
         # Infino requires POST for bulk and NDJSON content type
         if self.database_type == "infino" and "/_bulk" in routed_path:
             if method != "POST":
-                self.logger.info(f"[INFINO DEBUG] Rewriting method {method} to POST for bulk endpoint {routed_path}")
                 method = "POST"
             routed_headers["content-type"] = "application/x-ndjson"
 
@@ -385,7 +382,6 @@ class RallySyncElasticsearch(Elasticsearch):
         
         # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
         if method == "GET" and path.startswith("/_cluster/health/"):
-            self.logger.info("[INFINO DEBUG] Rewriting path '/_cluster/health/{index}' to '/_cluster/health'")
             path = "/_cluster/health"
             
         # All operations work similarly to Elasticsearch
