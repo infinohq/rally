@@ -284,7 +284,7 @@ class RallySyncElasticsearch(Elasticsearch):
         try:
             self.logger.debug(f"INFINO REQUEST: About to execute {method} {routed_path}")
             self.logger.debug(f"INFINO REQUEST: Headers being sent: {routed_headers}")
-            response = self.transport.perform_request(method=method, target=routed_path, params=routed_params, headers=routed_headers, body=routed_body)
+            response = self.transport.perform_request(method=method, target=routed_path, headers=routed_headers, body=routed_body)
             response_body = response.body if hasattr(response, 'body') else response
             
             # Log successful responses for search operations
