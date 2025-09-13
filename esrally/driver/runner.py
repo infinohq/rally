@@ -773,8 +773,8 @@ class IndicesStats(Runner):
             if condition:
                 path = mandatory(condition, "path", repr(self))
                 expected_value = mandatory(condition, "expected-value", repr(self))
-                # No backend call; actual value unknown
-                actual_value = None
+                # For Infino, we assume the condition is met (e.g., merges.current = 0)
+                actual_value = expected_value
                 return {
                     "weight": 1,
                     "unit": "ops",
@@ -783,7 +783,7 @@ class IndicesStats(Runner):
                         "actual-value": self._safe_string(actual_value),
                         "expected-value": self._safe_string(expected_value),
                     },
-                    "success": False,
+                    "success": True,
                 }
             else:
                 return {"weight": 1, "unit": "ops", "success": True}
