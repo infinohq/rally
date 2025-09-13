@@ -238,6 +238,13 @@ class RallySyncElasticsearch(Elasticsearch):
             if "content-type" not in routed_headers:
                 routed_headers["content-type"] = "application/json"
 
+        # Infino requires POST for bulk and NDJSON content type
+        if self.database_type == "infino" and "/_bulk" in routed_path:
+            if method != "POST":
+                self.logger.info(f"[INFINO DEBUG] Rewriting method {method} to POST for bulk endpoint {routed_path}")
+                method = "POST"
+            routed_headers["content-type"] = "application/x-ndjson"
+
         # Handle params compatibility - newer elasticsearch-py doesn't accept params as kwarg
         if routed_params:
             # Merge params into the target URL
