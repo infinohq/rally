@@ -186,6 +186,9 @@ class RallySyncElasticsearch(Elasticsearch):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
+        # DEBUG: Log all requests for Infino
+        if self.database_type == "infino":
+            self.logger.info(f"RALLY DEBUG SYNC: {method} {path} (params: {params})")
         # We need to ensure that we provide content-type and accept headers
         if body is not None:
             if headers is None:
@@ -286,6 +289,13 @@ class RallySyncElasticsearch(Elasticsearch):
             self.logger.debug(f"INFINO REQUEST: Headers being sent: {routed_headers}")
             response = self.transport.perform_request(method=method, target=routed_path, headers=routed_headers, body=routed_body)
             response_body = response.body if hasattr(response, 'body') else response
+            
+            # DEBUG: Log response for Infino
+            if self.database_type == "infino":
+                self.logger.info(f"RALLY DEBUG SYNC: Response {response.meta.status if hasattr(response, 'meta') else 'unknown'} for {method} {routed_path}")
+                self.logger.info(f"RALLY DEBUG SYNC: Response body type: {type(response_body)}")
+                if isinstance(response_body, str) and len(response_body) < 500:
+                    self.logger.info(f"RALLY DEBUG SYNC: Response body: {response_body}")
             
             # Log successful responses for search operations
             if "/_search" in routed_path:
