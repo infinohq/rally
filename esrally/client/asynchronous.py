@@ -540,11 +540,11 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         else:
             target = path
 
-        # Add debug logging for bulk request progress every 10 requests
+        # Add info logging for bulk request progress every 10 requests
         if "/_bulk" in path:
             self._bulk_request_counter += 1
             if self._bulk_request_counter % 10 == 0:
-                self.logger.debug(f"Async bulk request progress: {self._bulk_request_counter} requests completed")
+                self.logger.info(f"Async bulk request progress for {self.database_type}: {self._bulk_request_counter} requests completed")
 
         meta, resp_body = await self.transport.perform_request(
             method,
