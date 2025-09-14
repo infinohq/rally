@@ -1288,8 +1288,9 @@ class Query(Runner):
         
         if is_infino:
             if not index:
-                # For Infino global search, use *:*/_search format instead of /_search
-                path = "*:*/_search"
+                # For Infino global search, use /*:*/_search format (note the leading slash)
+                path = "/*:*/_search"
+                return await es.perform_request(method="GET", path=path, params=params, body=body, headers=headers)
             else:
                 # Standard Rally logic for index search
                 components = []
