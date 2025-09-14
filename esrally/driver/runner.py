@@ -1573,21 +1573,6 @@ class DeleteIndex(Runner):
             or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
         )
 
-        # For Infino, do not call the cluster at all for delete-index. Treat as a successful no-op.
-        if is_infino:
-            # Ensure request timing is set for the driver even though we skip any HTTP calls
-            RequestContextHolder.on_request_start()
-            RequestContextHolder.on_request_end()
-            self.logger.info(
-                "[Infino] Skipping delete-index calls (no HEAD/DELETE). Treating as successful no-op for indices: %s",
-                indices,
-            )
-            return {
-                "weight": len(indices),
-                "unit": "ops",
-                "success": True,
-            }
-
         # bypass cluster settings access for serverless
         prior_destructive_setting = None
         if not self.serverless_mode or self.serverless_operator:

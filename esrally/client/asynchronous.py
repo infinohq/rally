@@ -354,6 +354,9 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
+        # DEBUG: Log all requests for Infino
+        if self.database_type == "infino":
+            self.logger.info(f"RALLY DEBUG: {method} {path} (params: {params})")
         # Detect if Rally requested a raw response (used by bulk fast path)
         try:
             ctx = RequestContextHolder.request_context.get()
@@ -513,50 +516,47 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 return stats_meta, real_stats
                 
             except Exception as e:
-                # Fallback to basic stats if _cat/indices fails
-                fallback_stats = {
-                    "_all": {
-                        "total": {
-                            "merges": {
-                                "current": 0,
-                                "current_docs": 0,
-                                "current_size_in_bytes": 0,
-                                "total": 0,
-                                "total_time_in_millis": 0,
-                                "total_docs": 0,
-                                "total_size_in_bytes": 0
-                            }
-                        }
-                    }
-                }
-                from types import SimpleNamespace
-                fallback_meta = SimpleNamespace()
-                fallback_meta.status = 200
-                fallback_meta.headers = {}
-                return fallback_meta, fallback_stats
+                # If _cat/indices fails, let the benchmark fail rather than continue with fake stats
+                self.logger.error(f"Failed to get Infino stats via _cat/indices: {e}")
+                raise
 
         if params:
             target = f"{path}?{_quote_query(params)}"
         else:
             target = path
 
-        # Add info logging for bulk request progress every 10 requests
+        # Add info logging for bulk request progress every 100 requests
         if "/_bulk" in path:
             self._bulk_request_counter += 1
-            if self._bulk_request_counter % 10 == 0:
+            if self._bulk_request_counter % 100 == 0:
                 self.logger.info(f"Async bulk request progress for {self.database_type}: {self._bulk_request_counter} requests completed")
 
-        meta, resp_body = await self.transport.perform_request(
-            method,
-            target,
-            headers=request_headers,
-            body=body,
-            request_timeout=self._request_timeout,
-            max_retries=self._max_retries,
-            retry_on_status=self._retry_on_status,
-            retry_on_timeout=self._retry_on_timeout,
-            client_meta=self._client_meta,
-        )
+        try:
+            meta, resp_body = await self.transport.perform_request(
+                method,
+                target,
+                headers=request_headers,
+                body=body,
+                request_timeout=self._request_timeout,
+                max_retries=self._max_retries,
+                retry_on_status=self._retry_on_status,
+                retry_on_timeout=self._retry_on_timeout,
+                client_meta=self._client_meta,
+            )
+            # DEBUG: Log response for Infino
+            if self.database_type == "infino":
+                self.logger.info(f"RALLY DEBUG: Response {meta.status} for {method} {target}")
+                if hasattr(meta, 'headers'):
+                    self.logger.info(f"RALLY DEBUG: Response headers: {dict(meta.headers)}")
+                self.logger.info(f"RALLY DEBUG: Response body type: {type(resp_body)}")
+                if isinstance(resp_body, str) and len(resp_body) < 500:
+                    self.logger.info(f"RALLY DEBUG: Response body: {resp_body}")
+        except Exception as e:
+            # DEBUG: Log errors for Infino
+            if self.database_type == "infino":
+                self.logger.error(f"RALLY DEBUG: Error for {method} {target}: {e}")
+                self.logger.error(f"RALLY DEBUG: Error type: {type(e)}")
+            raise
 
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
         # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
