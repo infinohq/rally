@@ -43,7 +43,7 @@ class EsClientFactory:
         self.client_options = dict(client_options)
         self.ssl_context = None
         # This attribute is necessary for the backwards-compatibility logic contained in
-        # RallySyncElasticsearch.perform_request() and RallyAsyncElasticsearch.perform_request(), and also for
+        # RallySyncElasticsearch.perform_request() and RallyAsyncDatabase.perform_request(), and also for
         # identification of whether or not a client is 'serverless'.
         self.distribution_version = distribution_version
         self.distribution_flavor = distribution_flavor
@@ -211,23 +211,23 @@ class EsClientFactory:
         from elasticsearch.serializer import JSONSerializer
 
         from esrally.client.asynchronous import (
-            RallyAsyncElasticsearch,
+            RallyAsyncDatabase,
             RallyAsyncTransport,
         )
 
         class LazyJSONSerializer(JSONSerializer):
             def loads(self, data):
-                meta = RallyAsyncElasticsearch.request_context.get()
+                meta = RallyAsyncDatabase.request_context.get()
                 if "raw_response" in meta:
                     return io.BytesIO(data)
                 else:
                     return super().loads(data)
 
         async def on_request_start(session, trace_config_ctx, params):
-            RallyAsyncElasticsearch.on_request_start()
+            RallyAsyncDatabase.on_request_start()
 
         async def on_request_end(session, trace_config_ctx, params):
-            RallyAsyncElasticsearch.on_request_end()
+            RallyAsyncDatabase.on_request_end()
 
         trace_config = aiohttp.TraceConfig()
         trace_config.on_request_start.append(on_request_start)
@@ -258,9 +258,13 @@ class EsClientFactory:
             self.client_options.pop("basic_auth", None)
             self.client_options["api_key"] = api_key
 
-        async_client = RallyAsyncElasticsearch(
+        # Extract database_type from client options if provided
+        database_type = self.client_options.pop("database_type", "infino")
+
+        async_client = RallyAsyncDatabase(
             distribution_version=self.distribution_version,
             distribution_flavor=self.distribution_flavor,
+            database_type=database_type,
             hosts=self.hosts,
             transport_class=RallyAsyncTransport,
             ssl_context=self.ssl_context,
