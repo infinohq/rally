@@ -648,6 +648,9 @@ class BulkIndex(Runner):
                 if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
                     bulk_error_count += 1
                     self.extract_error_details(error_details, data)
+                    # Debug logging for bulk error analysis
+                    if hasattr(self, 'logger'):
+                        self.logger.info(f"RALLY BULK ERROR: status={data.get('status')}, error={data.get('error', {}).get('reason', 'No reason')}")
                 else:
                     bulk_success_count += 1
         stats = {
