@@ -293,7 +293,7 @@ class RallyIlmClient(IlmClient):
         return await IlmClient.put_lifecycle(self, **kwargs)
 
 
-class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
+class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
     def __init__(self, *args, **kwargs):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)

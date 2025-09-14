@@ -345,7 +345,7 @@ class TestEsClientFactory:
 
         assert client_options == original_client_options
 
-    @mock.patch("esrally.client.asynchronous.RallyAsyncElasticsearch")
+    @mock.patch("esrally.client.asynchronous.RallyAsyncDatabase")
     def test_create_async_client_with_api_key_auth_override(self, es):
         hosts = [{"host": "localhost", "port": 9200}]
         client_options = {

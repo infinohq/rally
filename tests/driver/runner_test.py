@@ -29,7 +29,7 @@ import elasticsearch
 import pytest
 
 from esrally import client, config, exceptions
-from esrally.client.asynchronous import RallyAsyncElasticsearch
+from esrally.client.asynchronous import RallyAsyncDatabase
 from esrally.driver import runner
 
 
@@ -5846,7 +5846,7 @@ class TestCreateIlmPolicyRunner:
     @mock.patch("esrally.client.asynchronous.IlmClient")
     @pytest.mark.asyncio
     async def test_RallyIlmClient_rewrites_kwargs(self, es_ilm):
-        es = RallyAsyncElasticsearch(hosts=["http://localhost:9200"])
+        es = RallyAsyncDatabase(hosts=["http://localhost:9200"])
         es_ilm.put_lifecycle = mock.AsyncMock(return_value={})
 
         # simulating a custom runner that hasn't been refactored
