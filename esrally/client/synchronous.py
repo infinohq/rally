@@ -364,6 +364,13 @@ class RallySyncElasticsearch(Elasticsearch):
             self.logger.debug(f"INFINO ROUTING: Stats request detected: {path}")
             pass
         
+        # Infino search requests need proper path handling
+        if self.database_type == "infino" and method in ["GET", "POST"] and "/_search" in path:
+            # Handle global search requests (/_search) by converting to /*:*/_search
+            if path == "/_search":
+                path = "/*:*/_search"
+
+        
         # Remove ALL query parameters for Infino - it doesn't support any parameters
         if self.database_type == "infino" and params:
             self.logger.debug(f"INFINO ROUTING: Original params: {params}")
