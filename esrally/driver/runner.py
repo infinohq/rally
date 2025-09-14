@@ -624,7 +624,18 @@ class BulkIndex(Runner):
             # determine success count regardless of unit because we need to iterate through all items anyway
             bulk_success_count = 0
             # Reparse fully in case of errors - this will be slower
-            parsed_response = json.loads(response.getvalue())
+            # Handle BytesIO response properly
+            if hasattr(response, 'getvalue'):
+                # BytesIO object from raw response mode
+                raw_content = response.getvalue()
+                if isinstance(raw_content, bytes):
+                    parsed_response = json.loads(raw_content.decode('utf-8'))
+                else:
+                    parsed_response = json.loads(raw_content)
+            else:
+                # Regular dict response
+                parsed_response = response
+            
             # Handle nested JSON-string bodies (e.g., '"{...}"') by decoding twice
             if isinstance(parsed_response, str):
                 try:

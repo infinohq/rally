@@ -313,26 +313,6 @@ class RallySyncElasticsearch(Elasticsearch):
             else:
                 self.logger.error(f"Request failed: {method} {routed_path} - {str(e)}")
             
-            # Handle Infino-specific errors that occur at transport level
-            if self.database_type == "infino" and method == "DELETE":
-                # Check for various error types that indicate unauthorized/not found
-                error_indicators = [
-                    "401" in str(e),
-                    "404" in str(e), 
-                    "Unauthorized" in str(e),
-                    "AuthenticationException" in str(type(e).__name__),
-                    hasattr(e, 'status_code') and e.status_code in [401, 404]
-                ]
-                
-                if any(error_indicators):
-                    # Infino returns 401/404 for deleting non-existent indexes, but Rally expects this to succeed
-                    # Create a fake successful response
-                    from types import SimpleNamespace
-                    fake_meta = SimpleNamespace()
-                    fake_meta.status = 200
-                    fake_meta.headers = {}
-                    response_body = {"acknowledged": True}
-                    return response_body
             
             raise
 
