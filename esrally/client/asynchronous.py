@@ -327,6 +327,8 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         self.distribution_flavor = distribution_flavor
         self.database_type = database_type
         self.logger = logging.getLogger(__name__)
+        # Counter for bulk request progress logging
+        self._bulk_request_counter = 0
 
         # some ILM method signatures changed in 'elasticsearch-py' 8.x,
         # so we override method(s) here to provide BWC for any custom
@@ -537,6 +539,12 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
             target = f"{path}?{_quote_query(params)}"
         else:
             target = path
+
+        # Add debug logging for bulk request progress every 10 requests
+        if "/_bulk" in path:
+            self._bulk_request_counter += 1
+            if self._bulk_request_counter % 10 == 0:
+                self.logger.debug(f"Async bulk request progress: {self._bulk_request_counter} requests completed")
 
         meta, resp_body = await self.transport.perform_request(
             method,
