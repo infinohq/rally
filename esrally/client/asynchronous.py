@@ -421,9 +421,6 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 method = "POST"
             # Bulk uses newline-delimited JSON
             request_headers["content-type"] = "application/x-ndjson"
-            # Add debug logging for bulk requests
-            logger = logging.getLogger(__name__)
-            logger.info(f"ASYNC BULK REQUEST: method={method} path={path} body_size={len(str(body)) if body else 0}")
         
         # Infino doesn't support /_stats - use _cat/indices to get real stats
         if self.database_type == "infino" and method == "GET" and "/_stats" in path:
@@ -535,26 +532,17 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         else:
             target = path
 
-        # Add response logging for bulk requests
-        logger = logging.getLogger(__name__)
-        try:
-            meta, resp_body = await self.transport.perform_request(
-                method,
-                target,
-                headers=request_headers,
-                body=body,
-                request_timeout=self._request_timeout,
-                max_retries=self._max_retries,
-                retry_on_status=self._retry_on_status,
-                retry_on_timeout=self._retry_on_timeout,
-                client_meta=self._client_meta,
-            )
-            if self.database_type == "infino" and "/_bulk" in path:
-                logger.info(f"ASYNC BULK RESPONSE: status={meta.status} response_type={type(resp_body)}")
-        except Exception as e:
-            if self.database_type == "infino" and "/_bulk" in path:
-                logger.error(f"ASYNC BULK ERROR: {str(e)}")
-            raise
+        meta, resp_body = await self.transport.perform_request(
+            method,
+            target,
+            headers=request_headers,
+            body=body,
+            request_timeout=self._request_timeout,
+            max_retries=self._max_retries,
+            retry_on_status=self._retry_on_status,
+            retry_on_timeout=self._retry_on_timeout,
+            client_meta=self._client_meta,
+        )
 
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
         # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
