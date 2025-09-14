@@ -1282,13 +1282,41 @@ class Query(Runner):
             raise exceptions.RallyError(f"No runner available for operation-type: [{operation_type}]")
 
     async def _raw_search(self, es, doc_type, index, body, params, headers=None):
-        components = []
-        if index:
-            components.append(index)
-        if doc_type:
-            components.append(doc_type)
-        components.append("_search")
-        path = "/".join(components)
+        # Check if this is Infino and handle global search differently
+        database_type = getattr(es, "database_type", None)
+        is_infino = database_type == "infino"
+        
+        if is_infino:
+            if not index:
+                # For Infino global search, use *:*/_search format instead of /_search
+                path = "*:*/_search"
+            else:
+                # Standard Rally logic for index search
+                components = []
+                if index:
+                    components.append(index)
+                components.append("_search")
+                path = "/".join(components)
+        else:
+            # Standard Rally logic
+            components = []
+            if index:
+                components.append(index)
+            if doc_type:
+                components.append(doc_type)
+            components.append("_search")
+            path = "/".join(components)
+        
+        # DEBUG: Log the exact URL being constructed
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"RALLY _raw_search DEBUG: method=GET, path=/{path}, index={index}, doc_type={doc_type}, is_infino={is_infino}")
+        logger.error(f"RALLY _raw_search DEBUG: es.database_type = {getattr(es, 'database_type', 'NOT_FOUND')}")
+        if hasattr(es, '_client'):
+            logger.error(f"RALLY _raw_search DEBUG: es._client.database_type = {getattr(es._client, 'database_type', 'NOT_FOUND')}")
+        if hasattr(es, 'transport'):
+            logger.error(f"RALLY _raw_search DEBUG: es.transport.database_type = {getattr(es.transport, 'database_type', 'NOT_FOUND')}")
+        
         return await es.perform_request(method="GET", path="/" + path, params=params, body=body, headers=headers)
 
     def _query_headers(self, params):
