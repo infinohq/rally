@@ -385,7 +385,7 @@ class RallySyncElasticsearch(Elasticsearch):
             pass
         
         # Remove ALL query parameters for Infino - it doesn't support any parameters
-        if params:
+        if self.database_type == "infino" and params:
             self.logger.debug(f"INFINO ROUTING: Original params: {params}")
             params = {}  # Remove all parameters for Infino
             self.logger.debug(f"INFINO ROUTING: Removed all params - Infino doesn't support query parameters")
@@ -542,7 +542,6 @@ class RallySyncElasticsearch(Elasticsearch):
             # Get real stats from Infino's _cat/indices API and transform to Rally format
             try:
                 # Make a direct request to _cat/indices to avoid recursion
-                import urllib3
                 cat_resp = self.transport.perform_request(
                     method="GET", 
                     target="/_cat/indices",
@@ -575,24 +574,27 @@ class RallySyncElasticsearch(Elasticsearch):
                             if store_size.endswith('kb'):
                                 total_size_bytes += int(float(store_size[:-2]) * 1024)
                             elif store_size.endswith('mb'):
-                    }
-                }
-            }
-        }
-    except Exception as e:
-        # Fallback to basic stats if _cat/indices fails
-        self.logger.warning(f"Failed to get Infino stats via _cat/indices: {e}")
-        response_body = {
-            "_all": {
-                "total": {
-                    "merges": {
-                        "current": 0,
-                        "current_docs": 0,
-                        "current_size_in_bytes": 0,
-                        "total": 0,
-                        "total_time_in_millis": 0,
-                        "total_docs": 0,
-                        "total_size_in_bytes": 0
+                                total_size_bytes += int(float(store_size[:-2]) * 1024 * 1024)
+                            elif store_size.endswith('gb'):
+                                total_size_bytes += int(float(store_size[:-2]) * 1024 * 1024 * 1024)
+                            elif store_size.endswith('b'):
+                                total_size_bytes += int(float(store_size[:-1]))
+                        except (ValueError, TypeError):
+                            pass
+                            
+                # Create Rally-compatible stats response
+                response_body = {
+                    "_all": {
+                        "total": {
+                            "docs": {
+                                "count": total_docs
+                            },
+                            "store": {
+                                "size_in_bytes": total_size_bytes
+                            },
+                            "merges": {
+                                "current": 0,
+                                "current_docs": 0,
                                 "current_size_in_bytes": 0,
                                 "total": 0,
                                 "total_time_in_millis": 0,
@@ -602,12 +604,30 @@ class RallySyncElasticsearch(Elasticsearch):
                         }
                     }
                 }
-            
-            # Return in the same format as async client (meta, body tuple)
-            from types import SimpleNamespace
-            fake_meta = SimpleNamespace()
-            fake_meta.status = 200
-            fake_meta.headers = {}
-            return fake_meta, response_body
-    
-
+                
+            except Exception as e:
+                # Fallback to basic stats if _cat/indices fails
+                self.logger.warning(f"Failed to get Infino stats via _cat/indices: {e}")
+                response_body = {
+                    "_all": {
+                        "total": {
+                            "docs": {
+                                "count": 0
+                            },
+                            "store": {
+                                "size_in_bytes": 0
+                            },
+                            "merges": {
+                                "current": 0,
+                                "current_docs": 0,
+                                "current_size_in_bytes": 0,
+                                "total": 0,
+                                "total_time_in_millis": 0,
+                                "total_docs": 0,
+                                "total_size_in_bytes": 0
+                            }
+                        }
+                    }
+                }
+        
+        return response_body
