@@ -354,8 +354,8 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
-        # DEBUG: Log all requests for Infino
-        if self.database_type == "infino":
+        # DEBUG: Log all requests for Infino (skip bulk operations to reduce noise)
+        if self.database_type == "infino" and "/_bulk" not in path:
             self.logger.info(f"RALLY DEBUG: {method} {path} (params: {params})")
         # Detect if Rally requested a raw response (used by bulk fast path)
         try:
@@ -543,8 +543,8 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
                 retry_on_timeout=self._retry_on_timeout,
                 client_meta=self._client_meta,
             )
-            # DEBUG: Log response for Infino
-            if self.database_type == "infino":
+            # DEBUG: Log response for Infino (skip bulk operations to reduce noise)
+            if self.database_type == "infino" and "/_bulk" not in target:
                 self.logger.info(f"RALLY DEBUG: Response {meta.status} for {method} {target}")
                 if hasattr(meta, 'headers'):
                     self.logger.info(f"RALLY DEBUG: Response headers: {dict(meta.headers)}")
