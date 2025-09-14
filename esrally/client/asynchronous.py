@@ -407,30 +407,9 @@ class RallyAsyncElasticsearch(AsyncElasticsearch, RequestContextHolder):
         if self.database_type == "infino" and method == "GET" and path.startswith("/_cluster/health/"):
             path = "/_cluster/health"
 
-        # Filter unsupported parameters for Infino search operations
-        if self.database_type == "infino" and "/_search" in path:
-            if params:
-                unsupported_params = [
-                    'request_cache',  # Rally adds this for caching
-                    'preference',     # Elasticsearch routing preference
-                    'routing',        # Elasticsearch routing
-                    'scroll',         # Elasticsearch scroll context
-                    'scroll_id',      # Elasticsearch scroll ID
-                    'search_type',    # Elasticsearch search type
-                    'allow_partial_search_results',  # Elasticsearch partial results
-                    'batched_reduce_size',  # Elasticsearch batched reduce
-                    'pre_filter_shard_size',  # Elasticsearch pre-filter
-                    'max_concurrent_shard_requests',  # Elasticsearch concurrency
-                    'rest_total_hits_as_int',  # Elasticsearch total hits format
-                    'typed_keys',     # Elasticsearch typed keys
-                ]
-                
-                filtered_params = {}
-                for key, value in params.items():
-                    if key not in unsupported_params:
-                        filtered_params[key] = value
-                
-                params = filtered_params
+        # Remove ALL query parameters for Infino - it doesn't support any parameters
+        if self.database_type == "infino" and params:
+            params = {}
 
         # Infino requires POST for bulk and NDJSON content type
         if self.database_type == "infino" and "/_bulk" in path:
