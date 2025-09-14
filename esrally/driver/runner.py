@@ -614,47 +614,35 @@ class BulkIndex(Runner):
         return stats
 
     def simple_stats(self, bulk_size, unit, response):
-        bulk_success_count = bulk_size if unit == "docs" else None
+        bulk_success_count = 0
         bulk_error_count = 0
         error_details = set()
-        # parse lazily on the fast path
-        props = parse(response, ["errors", "took"])
-
-        if props.get("errors", False):
-            # determine success count regardless of unit because we need to iterate through all items anyway
-            bulk_success_count = 0
-            # Reparse fully in case of errors - this will be slower
-            # Handle BytesIO response properly
-            if hasattr(response, 'getvalue'):
-                # BytesIO object from raw response mode
-                raw_content = response.getvalue()
-                if isinstance(raw_content, bytes):
-                    parsed_response = json.loads(raw_content.decode('utf-8'))
-                else:
-                    parsed_response = json.loads(raw_content)
+        
+        # Always parse the full response for Infino compatibility
+        # Handle BytesIO response properly
+        if hasattr(response, 'getvalue'):
+            # BytesIO object from raw response mode
+            raw_content = response.getvalue()
+            if isinstance(raw_content, bytes):
+                parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
-                # Regular dict response
-                parsed_response = response
+                parsed_response = json.loads(raw_content)
+        else:
+            # Regular dict response
+            parsed_response = response
+        
+        # Process all items to count successes and errors
+        for i, item in enumerate(parsed_response.get("items", [])):
+            data = next(iter(item.values()))
+            status = data.get("status", 0)
             
-            # Handle nested JSON-string bodies (e.g., '"{...}"') by decoding twice
-            if isinstance(parsed_response, str):
-                try:
-                    if parsed_response.lstrip().startswith(("{", "[")):
-                        parsed_response = json.loads(parsed_response)
-                except Exception:
-                    pass
-            for item in parsed_response["items"]:
-                data = next(iter(item.values()))
-                if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                    bulk_error_count += 1
-                    self.extract_error_details(error_details, data)
-                    # Debug logging for bulk error analysis
-                    if hasattr(self, 'logger'):
-                        self.logger.info(f"RALLY BULK ERROR: status={data.get('status')}, error={data.get('error', {}).get('reason', 'No reason')}")
-                else:
-                    bulk_success_count += 1
+            if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                bulk_error_count += 1
+                self.extract_error_details(error_details, data)
+            else:
+                bulk_success_count += 1
         stats = {
-            "took": props.get("took"),
+            "took": parsed_response.get("took"),
             "success": bulk_error_count == 0,
             "success-count": bulk_success_count,
             "error-count": bulk_error_count,
