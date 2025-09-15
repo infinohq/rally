@@ -1383,7 +1383,7 @@ class TestEsRaceStore:
     def test_add_annotation(self, id_uuid, console):
         self.es_mock.delete_by_query.return_value = {"deleted": 0}
         id_uuid.return_value = 7
-        self.cfg.add(config.Scope.application, "system", "***REMOVED***.track", "unittest-track")
+        self.cfg.add(config.Scope.application, "system", "admin.track", "unittest-track")
         self.cfg.add(config.Scope.application, "system", "add.chart_type", "unittest-chart_type")
         self.cfg.add(config.Scope.application, "system", "add.chart_name", "unittest-chart_name")
         self.cfg.add(config.Scope.application, "system", "add.message", "Test Annotation")
@@ -1404,7 +1404,7 @@ class TestEsRaceStore:
     @mock.patch("esrally.utils.console.println")
     def test_list_annotations(self, console):
         self.es_mock.search.return_value = {"hits": {"total": 0}}
-        self.cfg.add(config.Scope.application, "system", "***REMOVED***.track", "unittest-track")
+        self.cfg.add(config.Scope.application, "system", "admin.track", "unittest-track")
         self.cfg.add(config.Scope.application, "system", "list.to_date", "20160131")
         self.cfg.add(config.Scope.application, "system", "list.from_date", "20160230")
         self.race_store.list_annotations()
@@ -1426,7 +1426,7 @@ class TestEsRaceStore:
 
     def test_filter_race(self):
         self.es_mock.search.return_value = {"hits": {"total": 0}}
-        self.cfg.add(config.Scope.application, "system", "***REMOVED***.track", "unittest")
+        self.cfg.add(config.Scope.application, "system", "admin.track", "unittest")
         self.cfg.add(config.Scope.application, "system", "list.challenge", "unittest-challenge")
         self.cfg.add(config.Scope.application, "system", "list.races.benchmark_name", "unittest-test")
         self.cfg.add(config.Scope.application, "system", "list.races.user_tags", {"env-id": "123", "name": "unittest-test2"})
@@ -2116,9 +2116,9 @@ class TestFileRaceStore:
 
         self.race_store.store_race(race)
         assert len(self.race_store.list()) == 1
-        self.cfg.add(config.Scope.application, "system", "***REMOVED***.track", "unittest-2")
+        self.cfg.add(config.Scope.application, "system", "admin.track", "unittest-2")
         assert len(self.race_store.list()) == 0
-        self.cfg.add(config.Scope.application, "system", "***REMOVED***.track", "unittest")
+        self.cfg.add(config.Scope.application, "system", "admin.track", "unittest")
         assert len(self.race_store.list()) == 1
         self.cfg.add(config.Scope.application, "system", "list.races.benchmark_name", "unittest-test-2")
         assert len(self.race_store.list()) == 0
@@ -2373,7 +2373,7 @@ class TestGlobalStatsCalculator:
         del self.metrics_store
         del self.cfg
 
-    def test_add_***REMOVED***istrative_task_with_error_rate_in_report(self):
+    def test_add_administrative_task_with_error_rate_in_report(self):
         op = Operation(name="delete-index", operation_type="DeleteIndex", params={"include-in-reporting": False})
         task = Task("delete-index", operation=op, schedule="deterministic")
         challenge = Challenge(name="append-fast-with-conflicts", schedule=[task], meta_data={})

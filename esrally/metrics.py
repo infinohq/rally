@@ -1651,7 +1651,7 @@ class RaceStore:
         return int(self.cfg.opts("system", "list.max_results"))
 
     def _track(self):
-        return self.cfg.opts("system", "***REMOVED***.track", mandatory=False)
+        return self.cfg.opts("system", "admin.track", mandatory=False)
 
     def _benchmark_name(self):
         return self.cfg.opts("system", "list.races.benchmark_name", mandatory=False)
@@ -1678,7 +1678,7 @@ class RaceStore:
         return self.cfg.opts("system", "list.to_date", mandatory=False)
 
     def _dry_run(self):
-        return self.cfg.opts("system", "***REMOVED***.dry_run", mandatory=False)
+        return self.cfg.opts("system", "admin.dry_run", mandatory=False)
 
     def _id(self):
         return self.cfg.opts("system", "delete.id")

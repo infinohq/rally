@@ -274,15 +274,15 @@ class TestOperationType:
 
     def test_attributes(self):
         create_ilm_policy = track.OperationType.CreateIlmPolicy
-        assert create_ilm_policy.***REMOVED***_op is True
+        assert create_ilm_policy.admin_op is True
         assert create_ilm_policy.serverless_status == serverless.Status.Blocked
 
         node_stats = track.OperationType.NodeStats
-        assert node_stats.***REMOVED***_op is False
+        assert node_stats.admin_op is False
         assert node_stats.serverless_status == serverless.Status.Internal
 
         bulk = track.OperationType.Bulk
-        assert bulk.***REMOVED***_op is False
+        assert bulk.admin_op is False
         assert bulk.serverless_status == serverless.Status.Public
 
 
@@ -291,7 +291,7 @@ class TestTaskFilter:
         return track.Task(
             "create-index-task",
             track.Operation("create-index-op", operation_type=track.OperationType.CreateIndex.to_hyphenated_string()),
-            tags=["write-op", "***REMOVED***-op"],
+            tags=["write-op", "admin-op"],
         )
 
     def search_task(self):

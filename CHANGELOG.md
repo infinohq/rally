@@ -247,7 +247,7 @@
 #### Doc Changes
 
 * [#1600](https://github.com/elastic/rally/pull/1600): Add docs for create-track from data streams 
-* [#1572](https://github.com/elastic/rally/pull/1572): Mention that create/restore-snapshot is an ***REMOVED***istrative operation
+* [#1572](https://github.com/elastic/rally/pull/1572): Mention that create/restore-snapshot is an administrative operation
 * [#1568](https://github.com/elastic/rally/pull/1568): Encourage users to read tracks documentation
 * [#1557](https://github.com/elastic/rally/pull/1557): Remove duplicate property descriptions from corpora docs
 * [#1554](https://github.com/elastic/rally/pull/1554): Link to the 7.14.0 ES Python client docs.
@@ -553,7 +553,7 @@
 
 #### Bug Fixes
 
-* [#1132](https://github.com/elastic/rally/pull/1132): Allow for filtering of ***REMOVED***istrative tasks
+* [#1132](https://github.com/elastic/rally/pull/1132): Allow for filtering of administrative tasks
 * [#1126](https://github.com/elastic/rally/pull/1126): Respect specified order in composite task
 * [#1125](https://github.com/elastic/rally/pull/1125): Wait until cluster health is green
 * [#1124](https://github.com/elastic/rally/pull/1124): Treat some zero target-intervals as unthrottled
@@ -561,7 +561,7 @@
 * [#1121](https://github.com/elastic/rally/pull/1121): Ensure that sleep tasks are timed
 * [#1119](https://github.com/elastic/rally/pull/1119): Support trailing slashes for all URL schemes
 * [#1117](https://github.com/elastic/rally/pull/1117): Don't change scheduler on failed requests
-* [#1116](https://github.com/elastic/rally/pull/1116): Ensure ***REMOVED*** tasks are always executed
+* [#1116](https://github.com/elastic/rally/pull/1116): Ensure admin tasks are always executed
 * [#1111](https://github.com/elastic/rally/pull/1111): Allow trailing / in base-url
 * [#1103](https://github.com/elastic/rally/pull/1103): Accept some differing units for throttling
 

@@ -559,7 +559,7 @@ class TestApiKeys:
         client_id = 0
         assert client.create_api_key(es, client_id, max_attempts=3)
         # even though max_attempts is 3, this should only be called once
-        es.security.create_api_key.assert_called_once_with(name=f"***REMOVED***-{client_id}")
+        es.security.create_api_key.assert_called_once_with(name=f"admin-{client_id}")
 
     @mock.patch("elasticsearch.Elasticsearch")
     def test_api_key_creation_fails_on_405_and_raises_system_setup_error(self, es):
@@ -571,7 +571,7 @@ class TestApiKeys:
         ):
             client.create_api_key(es, client_id, max_attempts=5)
 
-        es.security.create_api_key.assert_called_once_with(name=f"***REMOVED***-{client_id}")
+        es.security.create_api_key.assert_called_once_with(name=f"admin-{client_id}")
 
     @mock.patch("time.sleep")
     @mock.patch("elasticsearch.Elasticsearch")
@@ -582,9 +582,9 @@ class TestApiKeys:
             _api_error(401, "Unauthorized"),
             elasticsearch.TransportError("Connection timed out"),
             _api_error(500, "Internal Server Error"),
-            {"id": "abc", "name": f"***REMOVED***-{client_id}", "api_key": "123"},
+            {"id": "abc", "name": f"admin-{client_id}", "api_key": "123"},
         ]
-        calls = [mock.call(name="***REMOVED***-0") for _ in range(5)]
+        calls = [mock.call(name="admin-0") for _ in range(5)]
 
         assert client.create_api_key(es, client_id, max_attempts=5)
         assert es.security.create_api_key.call_args_list == calls

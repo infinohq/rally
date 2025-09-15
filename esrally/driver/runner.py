@@ -64,13 +64,13 @@ def register_default_runners(config: Optional[types.Config] = None):
     register_runner(track.OperationType.FieldCaps, FieldCaps(), async_runner=True)
     register_runner(track.OperationType.Esql, Esql(), async_runner=True)
 
-    # This is an ***REMOVED***istrative operation but there is no need for a retry here as we don't issue a request
+    # This is an administrative operation but there is no need for a retry here as we don't issue a request
     register_runner(track.OperationType.Sleep, Sleep(), async_runner=True)
     # these requests should not be retried as they are not idempotent
     register_runner(track.OperationType.CreateSnapshot, CreateSnapshot(), async_runner=True)
     register_runner(track.OperationType.RestoreSnapshot, RestoreSnapshot(), async_runner=True)
     register_runner(track.OperationType.Downsample, Downsample(), async_runner=True)
-    # We treat the following as ***REMOVED***istrative commands and thus already start to wrap them in a retry.
+    # We treat the following as administrative commands and thus already start to wrap them in a retry.
     register_runner(track.OperationType.ClusterHealth, Retry(ClusterHealth()), async_runner=True)
     register_runner(track.OperationType.PutPipeline, Retry(PutPipeline()), async_runner=True)
     register_runner(track.OperationType.Refresh, Retry(Refresh()), async_runner=True)
@@ -737,7 +737,7 @@ class ForceMerge(Runner):
                 pass
             while not complete:
                 await asyncio.sleep(params.get("poll-period"))
-                tasks = await es.tasks.list(params={"actions": "indices:***REMOVED***/forcemerge"})
+                tasks = await es.tasks.list(params={"actions": "indices:admin/forcemerge"})
                 if len(tasks["nodes"]) == 0:
                     # empty nodes response indicates no tasks
                     complete = True

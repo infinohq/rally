@@ -202,7 +202,7 @@ class SizeCase:
     hundred_kilos=SizeCase(102400, 102400, 100.0, convert.Size.Unit.KB, "100.0KB"),
     milions=SizeCase(5000000, 5000000, 4.76837158203125, convert.Size.Unit.MB, "4.8MB"),
     bilions=SizeCase(4000000000, 4000000000, 3.725290298461914, convert.Size.Unit.GB, "3.7GB"),
-    trillions=SizeCase(2***REMOVED***, 2***REMOVED***, 1.8189894035458565, convert.Size.Unit.TB, "1.8TB"),
+    trillions=SizeCase(2147483648000000, 2147483648000000, 1.8189894035458565, convert.Size.Unit.TB, "1.8TB"),
 )
 def test_size(case: SizeCase):
     got = convert.size(case.value, unit=case.unit)
