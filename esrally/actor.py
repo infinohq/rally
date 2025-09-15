@@ -282,11 +282,11 @@ def bootstrap_actor_system(
                 local_ip = coordinator_ip = "127.0.0.1"
 
             if local_ip:
-                local_ip, ***REMOVED***_port = resolve(local_ip, ***REMOVED***_port)
+                local_ip, local_port = resolve(local_ip, local_port)
                 capabilities["ip"] = local_ip
 
-            if ***REMOVED***_port:
-                capabilities["Admin Port"] = ***REMOVED***_port
+            if local_port:
+                capabilities["Admin Port"] = local_port
 
             if coordinator_ip:
                 coordinator_ip, coordinator_port = resolve(coordinator_ip, coordinator_port)
