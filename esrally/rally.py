@@ -934,27 +934,7 @@ def print_help_on_errors():
     )
 
 
-def race(cfg: types.Config, kill_running_processes=False):
-    logger = logging.getLogger(__name__)
-
-    if kill_running_processes:
-        logger.info("Killing running Rally processes")
-
-        # Kill any lingering Rally processes before attempting to continue - the actor system needs to be a singleton on this machine
-        # noinspection PyBroadException
-        try:
-            process.kill_running_rally_instances()
-        except KeyboardInterrupt:
-            raise exceptions.UserInterrupted("User has cancelled the benchmark whilst terminating Rally instances.") from None
-        except BaseException:
-            logger.exception("Could not terminate potentially running Rally instances correctly. Attempting to go on anyway.")
-    else:
-        other_rally_processes = process.find_all_other_rally_processes()
-        if other_rally_processes:
-            pids = [p.pid for p in other_rally_processes]
-            logger.info(f"Found other Rally processes running (PIDs: {pids}), allowing concurrent execution for multi-database benchmarking.")
-            # Allow concurrent Rally processes for multi-database benchmarking
-
+def race(cfg: types.Config):
     with_actor_system(racecontrol.run, cfg)
 
 
@@ -1219,7 +1199,7 @@ def dispatch_sub_command(arg_parser, args, cfg: types.Config):
             cfg.add(config.Scope.applicationOverride, "mechanic", "cluster.name", args.cluster_name)
 
             configure_reporting_params(args, cfg)
-            race(cfg, args.kill_running_processes)
+            race(cfg)
         elif sub_command == "create-track":
             if args.data_streams is not None:
                 cfg.add(config.Scope.applicationOverride, "generator", "indices", "*")
