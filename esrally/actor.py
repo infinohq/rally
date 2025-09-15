@@ -260,16 +260,16 @@ def set_startup_method(method: ProcessStartupMethod) -> None:
 def bootstrap_actor_system(
     try_join: bool = False,
     prefer_local_only: bool = False,
-    local_ip: str | None = None,
-    ***REMOVED***_port: int | None = None,
-    coordinator_ip: str | None = None,
-    coordinator_port: int | None = None,
+    local_ip: Optional[str] = None,
+    local_port: Optional[int] = None,
+    coordinator_ip: Optional[str] = None,
+    coordinator_port: Optional[int] = None,
 ) -> thespian.actors.ActorSystem:
     system_base = __SYSTEM_BASE
     capabilities: dict[str, Any] = {}
     log_defs: Any = None
     if try_join and (
-        system_base != "multiprocTCPBase" or actor_system_already_running(ip=local_ip, port=***REMOVED***_port, system_base=system_base)
+        system_base != "multiprocTCPBase" or actor_system_already_running(ip=local_ip, port=local_port, system_base=system_base)
     ):
         LOG.info("Try joining already running actor system with system base [%s].", system_base)
     else:
@@ -282,11 +282,11 @@ def bootstrap_actor_system(
                 local_ip = coordinator_ip = "127.0.0.1"
 
             if local_ip:
-                local_ip, ***REMOVED***_port = resolve(local_ip, ***REMOVED***_port)
+                local_ip, local_port = resolve(local_ip, local_port)
                 capabilities["ip"] = local_ip
 
-            if ***REMOVED***_port:
-                capabilities["Admin Port"] = ***REMOVED***_port
+            if local_port:
+                capabilities["Admin Port"] = local_port
 
             if coordinator_ip:
                 coordinator_ip, coordinator_port = resolve(coordinator_ip, coordinator_port)
