@@ -741,14 +741,14 @@ class OperationType(Enum):
     CreateIlmPolicy = (56, AdminStatus.Yes, serverless.Status.Blocked)
     DeleteIlmPolicy = (57, AdminStatus.Yes, serverless.Status.Blocked)
 
-    def __init__(self, id: int, ***REMOVED***_status: AdminStatus, serverless_status: serverless.Status):
+    def __init__(self, id: int, admin_status: AdminStatus, serverless_status: serverless.Status):
         self.id = id
-        self.***REMOVED***_status = ***REMOVED***_status
+        self.admin_status = admin_status
         self.serverless_status = serverless_status
 
     @property
-    def ***REMOVED***_op(self):
-        return self.***REMOVED***_status == AdminStatus.Yes
+    def admin_op(self):
+        return self.admin_status == AdminStatus.Yes
 
     def to_hyphenated_string(self):
         """

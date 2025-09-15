@@ -1806,7 +1806,7 @@ class TrackSpecificationReader:
         try:
             op = track.OperationType.from_hyphenated_string(op_type_name)
             if "include-in-reporting" not in params:
-                params["include-in-reporting"] = not op.***REMOVED***_op
+                params["include-in-reporting"] = not op.admin_op
             self.logger.debug("Using built-in operation type [%s] for operation [%s].", op_type_name, op_name)
         except KeyError:
             self.logger.info("Using user-provided operation type [%s] for operation [%s].", op_type_name, op_name)

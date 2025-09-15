@@ -1129,7 +1129,7 @@ def dispatch_sub_command(arg_parser, args, cfg: types.Config):
         elif sub_command == "list":
             cfg.add(config.Scope.applicationOverride, "system", "list.config.option", args.configuration)
             cfg.add(config.Scope.applicationOverride, "system", "list.max_results", args.limit)
-            cfg.add(config.Scope.applicationOverride, "system", "***REMOVED***.track", args.track)
+            cfg.add(config.Scope.applicationOverride, "system", "admin.track", args.track)
             cfg.add(config.Scope.applicationOverride, "system", "list.races.benchmark_name", args.benchmark_name)
             cfg.add(config.Scope.applicationOverride, "system", "list.races.format", args.format)
             cfg.add(config.Scope.applicationOverride, "system", "list.races.user_tags", opts.to_dict(args.user_tags))
@@ -1142,16 +1142,16 @@ def dispatch_sub_command(arg_parser, args, cfg: types.Config):
         elif sub_command == "delete":
             cfg.add(config.Scope.applicationOverride, "system", "delete.config.option", args.configuration)
             cfg.add(config.Scope.applicationOverride, "system", "delete.id", args.id)
-            cfg.add(config.Scope.applicationOverride, "system", "***REMOVED***.dry_run", args.dry_run)
+            cfg.add(config.Scope.applicationOverride, "system", "admin.dry_run", args.dry_run)
             dispatch_delete(cfg)
         elif sub_command == "add":
             cfg.add(config.Scope.applicationOverride, "system", "add.config.option", args.configuration)
-            cfg.add(config.Scope.applicationOverride, "system", "***REMOVED***.track", args.track)
+            cfg.add(config.Scope.applicationOverride, "system", "admin.track", args.track)
             cfg.add(config.Scope.applicationOverride, "system", "add.message", args.message)
             cfg.add(config.Scope.applicationOverride, "system", "add.race_timestamp", args.race_timestamp)
             cfg.add(config.Scope.applicationOverride, "system", "add.chart_type", args.chart_type)
             cfg.add(config.Scope.applicationOverride, "system", "add.chart_name", args.chart_name)
-            cfg.add(config.Scope.applicationOverride, "system", "***REMOVED***.dry_run", args.dry_run)
+            cfg.add(config.Scope.applicationOverride, "system", "admin.dry_run", args.dry_run)
             dispatch_add(cfg)
         elif sub_command == "build":
             cfg.add(config.Scope.applicationOverride, "mechanic", "car.plugins", opts.csv_to_list(args.elasticsearch_plugins))
