@@ -703,7 +703,7 @@ class OperationType(Enum):
     Downsample = (20, AdminStatus.No, serverless.Status.Internal)
     Esql = (21, AdminStatus.No, serverless.Status.Public)
 
-    # ***REMOVED***istrative actions
+    # administrative actions
     ForceMerge = (22, AdminStatus.Yes, serverless.Status.Internal)
     ClusterHealth = (23, AdminStatus.Yes, serverless.Status.Internal)
     PutPipeline = (24, AdminStatus.Yes, serverless.Status.Public)

@@ -980,7 +980,7 @@ def with_actor_system(runnable, cfg: types.Config):
         actors = actor.bootstrap_actor_system(try_join=bool(already_running), prefer_local_only=not already_running)
         # We can only support remote benchmarks if we have a dedicated daemon that is not only bound to 127.0.0.1
         cfg.add(config.Scope.application, "system", "remote.benchmarking.supported", already_running)
-    # This happens when the ***REMOVED*** process could not be started, e.g. because it could not open a socket.
+    # This happens when the admin process could not be started, e.g. because it could not open a socket.
     except thespian.actors.InvalidActorAddress:
         LOG.info("Falling back to offline actor system.")
         actor.use_offline_actor_system()

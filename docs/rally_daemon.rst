@@ -59,7 +59,7 @@ Rally uses the actor system `Thespian <https://github.com/kquick/Thespian>`_ und
 
 At startup, `Thespian attempts to detect an appropriate IP address <https://thespianpy.com/doc/using#hH-9d33a877-b4f0-4012-9510-442d81b0837c>`_. If Rally fails to startup the actor system indicated by the following message::
 
-    thespian.actors.InvalidActorAddress: ActorAddr-(T|:1900) is not a valid ActorSystem ***REMOVED***
+    thespian.actors.InvalidActorAddress: ActorAddr-(T|:1900) is not a valid ActorSystem admin
 
 then set a routable IP address yourself by setting the environment variable ``THESPIAN_BASE_IPADDR`` before starting Rally.
 

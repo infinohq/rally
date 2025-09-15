@@ -679,7 +679,7 @@ Each operation consists of the following properties:
 
 * ``name`` (mandatory): The name of this operation. You can choose this name freely. It is only needed to reference the operation when defining schedules.
 * ``operation-type`` (mandatory): Type of this operation. See below for the operation types that are supported out of the box in Rally. You can also add arbitrary operations by defining :doc:`custom runners </adding_tracks>`.
-* ``include-in-reporting`` (optional, defaults to ``true`` for normal operations and to ``false`` for ***REMOVED***istrative operations): Whether or not this operation should be included in the command line report. For example you might want Rally to create an index for you but you are not interested in detailed metrics about it. Note that Rally will still record all metrics in the metrics store.
+* ``include-in-reporting`` (optional, defaults to ``true`` for normal operations and to ``false`` for administrative operations): Whether or not this operation should be included in the command line report. For example you might want Rally to create an index for you but you are not interested in detailed metrics about it. Note that Rally will still record all metrics in the metrics store.
 * ``assertions`` (optional, defaults to ``None``): A list of assertions that should be checked. See below for more details.
 * ``request-timeout`` (optional, defaults to ``None``): The client-side timeout for this operation. Represented as a floating-point number in seconds, e.g. ``1.5``.
 * ``headers`` (optional, defaults to ``None``): A dictionary of key-value pairs to pass as headers in the operation.
@@ -923,7 +923,7 @@ Properties
 * ``poll-period`` (defaults to 10s): Only applicable if ``mode`` is set to ``polling``. Determines the internal at which a check is performed that all force merge operations are complete.
 * ``max-num-segments`` (optional)  The number of segments the index should be merged into. Defaults to simply checking if a merge needs to execute, and if so, executes it.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. If reporting is forced by setting ``include-in-reporting`` to ``true``, then throughput is reported as the number of completed force-merge operations per second.
+This is an administrative operation. Metrics are not reported by default. If reporting is forced by setting ``include-in-reporting`` to ``true``, then throughput is reported as the number of completed force-merge operations per second.
 
 Meta-data
 """""""""
@@ -1266,7 +1266,7 @@ Please see `the pipeline documentation <https://www.elastic.co/guide/en/elastics
 
 This example requires that the ``ingest-geoip`` Elasticsearch plugin is installed.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1299,7 +1299,7 @@ Example::
       }
     }
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1334,7 +1334,7 @@ Example::
       "retry-until-success": true
     }
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1357,7 +1357,7 @@ Properties
 
 * ``index`` (optional, defaults to ``_all``): The name of the index or data stream that should be refreshed.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1425,7 +1425,7 @@ With the following snippet we will create a new index that is not defined in the
 .. note::
    Types have been removed in Elasticsearch 7.0.0. If you want to benchmark Elasticsearch 7.0.0 or later you need to remove the mapping type above.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1478,7 +1478,7 @@ With the following snippet we will delete all ``logs-*`` indices::
       }
     }
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1621,7 +1621,7 @@ With the following snippet we will create a new data stream that is not defined 
       "data-stream": "people"
     }
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1669,7 +1669,7 @@ With the following snippet we will delete all ``ds-logs-*`` data streams::
       "only-if-exists": false
     }
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1734,7 +1734,7 @@ With the following snippet we will create a new index template that is not defin
 .. note::
     If your composable template references component templates, such as in the example above, ensure these are created first using the ``create-component-template`` operation.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1801,7 +1801,7 @@ With the following snippet we will create a new component template that is not d
 .. note::
     If your component template is used in composable templates, ensure these are created after specifying this operation using the ``create-composable-template`` operation.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1868,7 +1868,7 @@ With the following snippet we will create a new index template that is not defin
 .. note::
    Types have been removed in Elasticsearch 7.0.0. If you want to benchmark Elasticsearch 7.0.0 or later you need to remove the mapping type above.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1923,7 +1923,7 @@ With the following snippet we will delete the `logs`` index template::
 .. note::
     If ``delete-matching-indices`` is set to ``true``, indices with the provided ``index-pattern`` are deleted regardless whether the index template has previously existed.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -1974,7 +1974,7 @@ With the following snippet we will delete the `component_template_with_2_shards`
 .. note::
     If the component templates you are attempting to delete are referenced by composable templates, these must be deleted first using the ``delete-composable-template`` operation.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2030,7 +2030,7 @@ With the following snippet we will delete the `default`` index template::
 .. note::
     If ``delete-matching-indices`` is set to ``true``, indices with the provided ``index-pattern`` are deleted regardless whether the index template has previously existed.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2114,7 +2114,7 @@ Properties
 
 This runner will intentionally ignore 404s from Elasticsearch so it is safe to execute this runner regardless whether a corresponding machine learning datafeed exists.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 Meta-data
 """""""""
@@ -2132,7 +2132,7 @@ Properties
 * ``datafeed-id`` (mandatory): The name of the machine learning datafeed to create.
 * ``body`` (mandatory): Request body containing the definition of the datafeed. Please see the `create datafeed API <https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-put-datafeed.html>`__ documentation for more details.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2155,7 +2155,7 @@ Properties
 * ``end`` (optional, defaults to empty): End timestamp of the datafeed.
 * ``timeout`` (optional, defaults to empty): Amount of time to wait until a datafeed starts.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2176,7 +2176,7 @@ Properties
 * ``force`` (optional, defaults to ``false``): Whether to forcefully stop an already started datafeed.
 * ``timeout`` (optional, defaults to empty): Amount of time to wait until a datafeed stops.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2198,7 +2198,7 @@ Properties
 
 This runner will intentionally ignore 404s from Elasticsearch so it is safe to execute this runner regardless whether a corresponding machine learning job exists.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2218,7 +2218,7 @@ Properties
 * ``job-id`` (mandatory): The name of the machine learning job to create.
 * ``body`` (mandatory): Request body containing the definition of the job. Please see the `create job API <https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-put-job.html>`__ documentation for more details.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2237,7 +2237,7 @@ Properties
 
 * ``job-id`` (mandatory): The name of the machine learning job to open.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2258,7 +2258,7 @@ Properties
 * ``force`` (optional, defaults to ``false``): Whether to forcefully stop an already opened job.
 * ``timeout`` (optional, defaults to empty): Amount of time to wait until a job stops.
 
-This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation works only if `machine-learning <https://www.elastic.co/products/stack/machine-learning>`__ is properly installed and enabled. This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2323,7 +2323,7 @@ Properties
 .. note::
     The ``sleep`` operation is only useful in very limited circumstances. To throttle throughput, specify a ``target-throughput`` on the corresponding task instead.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 Meta-data
 """""""""
@@ -2340,7 +2340,7 @@ Properties
 
 * ``repository`` (mandatory): The name of the snapshot repository to delete.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2361,7 +2361,7 @@ Properties
 * ``body`` (mandatory): The body of the create snapshot repository request.
 * ``request-params`` (optional): A structure containing HTTP request parameters.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2388,7 +2388,7 @@ Properties
     It's not recommended to rely on ``wait-for-completion=true``. Instead you should keep the default value (``False``) and use an additional ``wait-for-snapshot-create`` operation in the next step.
     This is mandatory on `Elastic Cloud <https://www.elastic.co/cloud>`_ or environments where Elasticsearch is connected via intermediate network components, such as proxies, that may terminate the blocking connection after a timeout.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 Meta-data
 """""""""
@@ -2465,7 +2465,7 @@ Properties
 
     However, this might not work if a proxy is in between the client and Elasticsearch and the proxy has a shorter request timeout configured than the client. In this case, keep the default value for ``wait-for-completion`` and instead add a ``wait-for-recovery`` runner in the next step.
 
-This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 Meta-data
 """""""""
@@ -2506,7 +2506,7 @@ Properties
 * ``body`` (mandatory): Request body containing the configuration of the transform. Please see the `create transform API <https://www.elastic.co/guide/en/elasticsearch/reference/current/put-transform.html>`__ documentation for more details.
 * ``defer-validation`` (optional, defaults to false): When true, deferrable validations are not run. This behavior may be desired if the source index does not exist until after the transform is created.
 
-This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2526,7 +2526,7 @@ Properties
 * ``transform-id`` (mandatory): The id of the transform to start.
 * ``timeout`` (optional, defaults to empty): Amount of time to wait until a transform starts.
 
-This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2551,7 +2551,7 @@ Properties
 * ``transform-timeout`` (optional, defaults to `3600` (`1h`)) Overall runtime timeout of the batch transform in seconds.
 * ``poll-interval`` (optional, defaults to `0.5`) How often transform stats are polled, used to set progress and check the state. You should not set this too low, because polling can skew the result.
 
-This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 
@@ -2574,7 +2574,7 @@ Properties
 * ``transform-id`` (mandatory): The id of the transform to delete.
 * ``force`` (optional, defaults to false): Whether to delete the transform regardless of its current state.
 
-This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an ***REMOVED***istrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
+This operation requires at least Elasticsearch 7.5.0 (non-OSS). This is an administrative operation. Metrics are not reported by default. Reporting can be forced by setting ``include-in-reporting`` to ``true``.
 
 This operation is :ref:`retryable <track_operations>`.
 

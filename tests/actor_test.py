@@ -75,7 +75,7 @@ class BootstrapActorSystemCase:
     try_join: bool = False
     prefer_local_only: bool = False
     local_ip: str | None = None
-    ***REMOVED***_port: int | None = None
+    admin_port: int | None = None
     coordinator_ip: str | None = None
     coordinator_port: int | None = None
     want_error: tuple[Exception, ...] = tuple()
@@ -112,8 +112,8 @@ class BootstrapActorSystemCase:
         want_capabilities={"coordinator": True, "ip": "127.0.0.1!r"},
         want_log_defs=True,
     ),
-    ***REMOVED***_port=BootstrapActorSystemCase(
-        ***REMOVED***_port=1024,
+    admin_port=BootstrapActorSystemCase(
+        admin_port=1024,
         want_capabilities={"coordinator": True, "Admin Port": 1024},
         want_log_defs=True,
     ),
@@ -172,7 +172,7 @@ class BootstrapActorSystemCase:
         try_join=True,
         already_running=True,
         local_ip="10.0.0.2",
-        ***REMOVED***_port=2000,
+        admin_port=2000,
         want_connect=("10.0.0.2", 2000),
     ),
     try_join_process_startup_method=BootstrapActorSystemCase(
@@ -267,7 +267,7 @@ def test_bootstrap_actor_system(
             try_join=case.try_join,
             prefer_local_only=case.prefer_local_only,
             local_ip=case.local_ip,
-            ***REMOVED***_port=case.***REMOVED***_port,
+            admin_port=case.admin_port,
             coordinator_ip=case.coordinator_ip,
             coordinator_port=case.coordinator_port,
         )
