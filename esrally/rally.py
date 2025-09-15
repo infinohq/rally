@@ -952,14 +952,8 @@ def race(cfg: types.Config, kill_running_processes=False):
         other_rally_processes = process.find_all_other_rally_processes()
         if other_rally_processes:
             pids = [p.pid for p in other_rally_processes]
-
-            msg = (
-                f"There are other Rally processes running on this machine (PIDs: {pids}) but only one Rally "
-                f"benchmark is allowed to run at the same time.\n\nYou can use --kill-running-processes flag "
-                f"to kill running processes automatically and allow Rally to continue to run a new benchmark. "
-                f"Otherwise, you need to manually kill them."
-            )
-            raise exceptions.RallyError(msg)
+            logger.info(f"Found other Rally processes running (PIDs: {pids}), allowing concurrent execution for multi-database benchmarking.")
+            # Allow concurrent Rally processes for multi-database benchmarking
 
     with_actor_system(racecontrol.run, cfg)
 
