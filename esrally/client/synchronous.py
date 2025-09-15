@@ -141,18 +141,34 @@ class RallySyncElasticsearch(Elasticsearch):
         distribution_flavor = kwargs.pop("distribution_flavor", None)
         self.database_type = kwargs.pop("database_type", "elasticsearch")
         
+        # Extract Infino credentials from kwargs
+        infino_auth = kwargs.pop("infino_auth", None)
+        infino_client_cert = kwargs.pop("infino_client_cert", None)
+        infino_client_id = kwargs.pop("infino_client_id", None)
+        infino_account_id = kwargs.pop("infino_account_id", None)
+        infino_thread_id = kwargs.pop("infino_thread_id", None)
+        infino_username = kwargs.pop("infino_username", None)
+        
         # Add Infino authentication headers to default headers for ALL requests
         if self.database_type == "infino":
             infino_headers = {
-                "Authorization": "***REMOVED***",
-                "***REMOVED***": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VYTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
-                "***REMOVED***": "***REMOVED***",
-                "***REMOVED***": "***REMOVED***",
-                "***REMOVED***": "***REMOVED***",
-                "***REMOVED***": "***REMOVED***",
                 "x-opensearch-product-origin": "opensearch-dashboards",
                 "content-type": "application/json",
             }
+            
+            # Only add headers if they are provided
+            if infino_auth:
+                infino_headers["Authorization"] = infino_auth
+            if infino_client_cert:
+                infino_headers["x-infino-client-cert"] = infino_client_cert
+            if infino_client_id:
+                infino_headers["x-infino-client-id"] = infino_client_id
+            if infino_account_id:
+                infino_headers["x-infino-account-id"] = infino_account_id
+            if infino_thread_id:
+                infino_headers["x-infino-thread-id"] = infino_thread_id
+            if infino_username:
+                infino_headers["x-infino-username"] = infino_username
             
             # Merge with any existing headers
             if 'headers' in kwargs:
