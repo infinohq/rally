@@ -265,6 +265,13 @@ def bootstrap_actor_system(
     coordinator_ip: Optional[str] = None,
     coordinator_port: Optional[int] = None,
 ) -> thespian.actors.ActorSystem:
+    # Auto-assign unique ports for parallel instances based on process ID
+    import os
+    if local_port is None:
+        # Use process ID to generate unique port for each Rally instance
+        base_port = 19200
+        pid_offset = os.getpid() % 1000  # Use last 3 digits of PID
+        local_port = base_port + pid_offset
     system_base = __SYSTEM_BASE
     capabilities: dict[str, Any] = {}
     log_defs: Any = None
