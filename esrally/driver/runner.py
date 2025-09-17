@@ -618,18 +618,20 @@ class BulkIndex(Runner):
         bulk_error_count = 0
         error_details = set()
         
-        # Always parse the full response for Infino compatibility
-        # Handle BytesIO response properly
+        # Handle different response types based on database
         if hasattr(response, 'getvalue'):
-            # BytesIO object from raw response mode
+            # BytesIO object from raw response mode (Infino)
             raw_content = response.getvalue()
             if isinstance(raw_content, bytes):
                 parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
                 parsed_response = json.loads(raw_content)
-        else:
-            # Regular dict response
+        elif isinstance(response, dict):
+            # Regular dict response (Elasticsearch/OpenSearch)
             parsed_response = response
+        else:
+            # Fallback - try to parse as JSON string
+            parsed_response = json.loads(response)
         
         # Process all items to count successes and errors
         for i, item in enumerate(parsed_response.get("items", [])):
