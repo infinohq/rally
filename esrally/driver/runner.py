@@ -618,21 +618,43 @@ class BulkIndex(Runner):
         bulk_error_count = 0
         error_details = set()
         
-        # Handle different response types based on database
-        # Check for dict first since some response objects may have both dict and getvalue() methods
-        if isinstance(response, dict):
-            # Regular dict response (Elasticsearch/OpenSearch)
-            parsed_response = response
-        elif hasattr(response, 'getvalue'):
-            # BytesIO object from raw response mode (Infino)
+        # Check if this is an Elasticsearch response (BytesIO) vs other databases
+        if hasattr(response, 'getvalue') and not isinstance(response, dict):
+            # Elasticsearch/OpenSearch - use original Elasticsearch approach
+            bulk_success_count = bulk_size if unit == "docs" else None
+            # parse lazily on the fast path
+            props = parse(response, ["errors", "took"])
+
+            if props.get("errors", False):
+                # determine success count regardless of unit because we need to iterate through all items anyway
+                bulk_success_count = 0
+                # Reparse fully in case of errors - this will be slower
+                parsed_response = json.loads(response.getvalue())
+                for item in parsed_response["items"]:
+                    data = next(iter(item.values()))
+                    if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                        bulk_error_count += 1
+                        self.extract_error_details(error_details, data)
+                    else:
+                        bulk_success_count += 1
+            
+            stats = {
+                "took": props.get("took"),
+                "success": bulk_error_count == 0,
+                "success-count": bulk_success_count,
+                "error-count": bulk_error_count,
+            }
+            if bulk_error_count > 0:
+                stats["error-type"] = "bulk"
+                stats["error-description"] = self.error_description(error_details)
+            return stats
+        else:
+            # Non-Elasticsearch databases (like Infino) - keep existing logic
             raw_content = response.getvalue()
             if isinstance(raw_content, bytes):
                 parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
                 parsed_response = json.loads(raw_content)
-        else:
-            # Fallback - try to parse as JSON string
-            parsed_response = json.loads(response)
         
         # Process all items to count successes and errors
         for i, item in enumerate(parsed_response.get("items", [])):
