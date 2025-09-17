@@ -619,16 +619,17 @@ class BulkIndex(Runner):
         error_details = set()
         
         # Handle different response types based on database
-        if hasattr(response, 'getvalue'):
+        # Check for dict first since some response objects may have both dict and getvalue() methods
+        if isinstance(response, dict):
+            # Regular dict response (Elasticsearch/OpenSearch)
+            parsed_response = response
+        elif hasattr(response, 'getvalue'):
             # BytesIO object from raw response mode (Infino)
             raw_content = response.getvalue()
             if isinstance(raw_content, bytes):
                 parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
                 parsed_response = json.loads(raw_content)
-        elif isinstance(response, dict):
-            # Regular dict response (Elasticsearch/OpenSearch)
-            parsed_response = response
         else:
             # Fallback - try to parse as JSON string
             parsed_response = json.loads(response)
