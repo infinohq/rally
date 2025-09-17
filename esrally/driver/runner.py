@@ -637,6 +637,15 @@ class BulkIndex(Runner):
                         self.extract_error_details(error_details, data)
                     else:
                         bulk_success_count += 1
+            else:
+                # No errors detected in fast path, but we still need to count actual documents
+                # Parse the full response to get accurate document counts for throughput metrics
+                parsed_response = json.loads(response.getvalue())
+                bulk_success_count = 0
+                for item in parsed_response.get("items", []):
+                    data = next(iter(item.values()))
+                    if data.get("status", 0) <= 299 and not ("_shards" in data and data["_shards"]["failed"] > 0):
+                        bulk_success_count += 1
             
             stats = {
                 "took": props.get("took"),
