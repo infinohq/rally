@@ -613,58 +613,30 @@ class BulkIndex(Runner):
 
         return stats
 
-    def simple_stats(self, bulk_size, unit, response):
+    def simple_stats(self, es, bulk_size, unit, response):
         bulk_success_count = 0
         bulk_error_count = 0
         error_details = set()
         
-        # Check if this is an Elasticsearch response (dict) vs other databases (BytesIO)
-        if isinstance(response, dict):
-            # Elasticsearch/OpenSearch - use original Elasticsearch approach
-            bulk_success_count = bulk_size if unit == "docs" else None
-            # parse lazily on the fast path
-            props = parse(response, ["errors", "took"])
-
-            if props.get("errors", False):
-                # determine success count regardless of unit because we need to iterate through all items anyway
-                bulk_success_count = 0
-                # For Elasticsearch dict responses, no need to parse - response is already parsed
-                for item in response["items"]:
-                    data = next(iter(item.values()))
-                    if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                        bulk_error_count += 1
-                        self.extract_error_details(error_details, data)
-                    else:
-                        bulk_success_count += 1
-            else:
-                # No errors detected in fast path, but we still need to count actual documents
-                # For Elasticsearch dict responses, response is already parsed
-                bulk_success_count = 0
-                for item in response.get("items", []):
-                    data = next(iter(item.values()))
-                    if data.get("status", 0) <= 299 and not ("_shards" in data and data["_shards"]["failed"] > 0):
-                        bulk_success_count += 1
-            
-            stats = {
-                "took": props.get("took"),
-                "success": bulk_error_count == 0,
-                "success-count": bulk_success_count,
-                "error-count": bulk_error_count,
-            }
-            if bulk_error_count > 0:
-                stats["error-type"] = "bulk"
-                stats["error-description"] = self.error_description(error_details)
-            return stats
-        else:
-            # Non-Elasticsearch databases (like Infino) - keep existing logic
+        # Detect database type using the same pattern as other functions
+        is_infino = (
+            getattr(es, "database_type", None) == "infino"
+            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
+        )
+        
+        if is_infino:
+            # Infino - parse BytesIO response
             raw_content = response.getvalue()
             if isinstance(raw_content, bytes):
                 parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
                 parsed_response = json.loads(raw_content)
-        
+        else:
+            # Elasticsearch - response is already a dict
+            parsed_response = response
+            
         # Process all items to count successes and errors
-        for i, item in enumerate(parsed_response.get("items", [])):
+        for item in parsed_response.get("items", []):
             data = next(iter(item.values()))
             status = data.get("status", 0)
             
@@ -673,6 +645,7 @@ class BulkIndex(Runner):
                 self.extract_error_details(error_details, data)
             else:
                 bulk_success_count += 1
+
         stats = {
             "took": parsed_response.get("took"),
             "success": bulk_error_count == 0,
@@ -682,6 +655,7 @@ class BulkIndex(Runner):
         if bulk_error_count > 0:
             stats["error-type"] = "bulk"
             stats["error-description"] = self.error_description(error_details)
+            
         return stats
 
     def extract_error_details(self, error_details, data):
