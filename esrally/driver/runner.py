@@ -618,8 +618,8 @@ class BulkIndex(Runner):
         bulk_error_count = 0
         error_details = set()
         
-        # Check if this is an Elasticsearch response (BytesIO) vs other databases
-        if hasattr(response, 'getvalue') and not isinstance(response, dict):
+        # Check if this is an Elasticsearch response (dict) vs other databases (BytesIO)
+        if isinstance(response, dict):
             # Elasticsearch/OpenSearch - use original Elasticsearch approach
             bulk_success_count = bulk_size if unit == "docs" else None
             # parse lazily on the fast path
@@ -628,9 +628,8 @@ class BulkIndex(Runner):
             if props.get("errors", False):
                 # determine success count regardless of unit because we need to iterate through all items anyway
                 bulk_success_count = 0
-                # Reparse fully in case of errors - this will be slower
-                parsed_response = json.loads(response.getvalue())
-                for item in parsed_response["items"]:
+                # For Elasticsearch dict responses, no need to parse - response is already parsed
+                for item in response["items"]:
                     data = next(iter(item.values()))
                     if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
                         bulk_error_count += 1
@@ -639,10 +638,9 @@ class BulkIndex(Runner):
                         bulk_success_count += 1
             else:
                 # No errors detected in fast path, but we still need to count actual documents
-                # Parse the full response to get accurate document counts for throughput metrics
-                parsed_response = json.loads(response.getvalue())
+                # For Elasticsearch dict responses, response is already parsed
                 bulk_success_count = 0
-                for item in parsed_response.get("items", []):
+                for item in response.get("items", []):
                     data = next(iter(item.values()))
                     if data.get("status", 0) <= 299 and not ("_shards" in data and data["_shards"]["failed"] > 0):
                         bulk_success_count += 1
