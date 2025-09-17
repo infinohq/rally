@@ -527,7 +527,7 @@ class BulkIndex(Runner):
         else:
             response = await es.bulk(doc_type=params.get("type"), params=bulk_params, **api_kwargs)
 
-        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(bulk_size, unit, response)
+        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response)
 
         meta_data = {
             "index": params.get("index"),
@@ -618,44 +618,79 @@ class BulkIndex(Runner):
         bulk_error_count = 0
         error_details = set()
         
-        # Detect database type using the same pattern as other functions
-        is_infino = (
-            getattr(es, "database_type", None) == "infino"
-            or (hasattr(es, "_client") and getattr(es._client, "database_type", None) == "infino")
-        )
-        
-        if is_infino:
-            # Infino - parse BytesIO response
-            raw_content = response.getvalue()
-            if isinstance(raw_content, bytes):
-                parsed_response = json.loads(raw_content.decode('utf-8'))
-            else:
-                parsed_response = json.loads(raw_content)
+        if isinstance(response, dict):
+            # Elasticsearch dict response - original approach
+            bulk_success_count = bulk_size if unit == "docs" else None
+            props = parse(response, ["errors", "took"])
+            
+            if props.get("errors", False):
+                bulk_success_count = 0
+                for item in response["items"]:
+                    data = next(iter(item.values()))
+                    if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                        bulk_error_count += 1
+                        self.extract_error_details(error_details, data)
+                    else:
+                        bulk_success_count += 1
+                        
+            stats = {
+                "took": props.get("took"),
+                "success": bulk_error_count == 0,
+                "success-count": bulk_success_count,
+                "error-count": bulk_error_count,
+            }
         else:
-            # Elasticsearch - response is already a dict
-            parsed_response = response
-            
-        # Process all items to count successes and errors
-        for item in parsed_response.get("items", []):
-            data = next(iter(item.values()))
-            status = data.get("status", 0)
-            
-            if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                bulk_error_count += 1
-                self.extract_error_details(error_details, data)
-            else:
-                bulk_success_count += 1
+            # BytesIO response - try Elasticsearch parsing first, fallback to Infino
+            try:
+                # Elasticsearch BytesIO response - original approach with lazy parsing
+                bulk_success_count = bulk_size if unit == "docs" else None
+                props = parse(response, ["errors", "took"])
 
-        stats = {
-            "took": parsed_response.get("took"),
-            "success": bulk_error_count == 0,
-            "success-count": bulk_success_count,
-            "error-count": bulk_error_count,
-        }
+                if props.get("errors", False):
+                    bulk_success_count = 0
+                    parsed_response = json.loads(response.getvalue())
+                    for item in parsed_response["items"]:
+                        data = next(iter(item.values()))
+                        if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                            bulk_error_count += 1
+                            self.extract_error_details(error_details, data)
+                        else:
+                            bulk_success_count += 1
+                            
+                stats = {
+                    "took": props.get("took"),
+                    "success": bulk_error_count == 0,
+                    "success-count": bulk_success_count,
+                    "error-count": bulk_error_count,
+                }
+            except:
+                # Fallback to Infino BytesIO response parsing
+                raw_content = response.getvalue()
+                if isinstance(raw_content, bytes):
+                    parsed_response = json.loads(raw_content.decode('utf-8'))
+                else:
+                    parsed_response = json.loads(raw_content)
+                    
+                for item in parsed_response.get("items", []):
+                    data = next(iter(item.values()))
+                    status = data.get("status", 0)
+                    
+                    if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                        bulk_error_count += 1
+                        self.extract_error_details(error_details, data)
+                    else:
+                        bulk_success_count += 1
+
+                stats = {
+                    "took": parsed_response.get("took"),
+                    "success": bulk_error_count == 0,
+                    "success-count": bulk_success_count,
+                    "error-count": bulk_error_count,
+                }
+            
         if bulk_error_count > 0:
             stats["error-type"] = "bulk"
             stats["error-description"] = self.error_description(error_details)
-            
         return stats
 
     def extract_error_details(self, error_details, data):
