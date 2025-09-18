@@ -527,7 +527,10 @@ class BulkIndex(Runner):
         else:
             response = await es.bulk(doc_type=params.get("type"), params=bulk_params, **api_kwargs)
 
-        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response)
+        # Force detailed_stats for Elasticsearch to handle dict responses properly
+        database_type = getattr(es, 'database_type', 'elasticsearch')
+        use_detailed = detailed_results or (database_type == 'elasticsearch') or (database_type == 'opensearch')
+        stats = self.detailed_stats(params, response) if use_detailed else self.simple_stats(es, bulk_size, unit, response)
 
         meta_data = {
             "index": params.get("index"),
