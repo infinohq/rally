@@ -527,10 +527,9 @@ class BulkIndex(Runner):
         else:
             response = await es.bulk(doc_type=params.get("type"), params=bulk_params, **api_kwargs)
 
-        # Force detailed_stats for Elasticsearch to handle dict responses properly
-        database_type = getattr(es, 'database_type', 'elasticsearch')
-        use_detailed = detailed_results or (database_type == 'elasticsearch') or (database_type == 'opensearch')
-        stats = self.detailed_stats(params, response) if use_detailed else self.simple_stats(es, bulk_size, unit, response)
+        # Use simple_stats for all databases to ensure consistent parsing and throughput calculations
+        # Only use detailed_stats when explicitly requested via detailed-results parameter
+        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response)
 
         meta_data = {
             "index": params.get("index"),
@@ -597,11 +596,19 @@ class BulkIndex(Runner):
                 self.extract_error_details(error_details, data)
             else:
                 bulk_success_count += 1
+        # Calculate throughput for consistent metrics with Infino
+        took_ms = response.get("took", 0)
+        throughput = None
+        if took_ms > 0 and bulk_success_count > 0:
+            # Convert milliseconds to seconds and calculate docs/s
+            throughput = (bulk_success_count * 1000.0) / took_ms
+
         stats = {
-            "took": response.get("took"),
+            "took": took_ms,
             "success": bulk_error_count == 0,
             "success-count": bulk_success_count,
             "error-count": bulk_error_count,
+            "throughput": throughput,
             "ops": ops,
             "shards_histogram": list(shards_histogram.values()),
             "bulk-request-size-bytes": bulk_request_size_bytes,
