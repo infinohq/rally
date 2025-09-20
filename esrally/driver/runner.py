@@ -628,30 +628,37 @@ class BulkIndex(Runner):
         bulk_error_count = 0
         error_details = set()
         
-        if isinstance(response, dict):
-            # Response is a dict
-            for item in response["items"]:
-                data = next(iter(item.values()))
-                if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                    bulk_error_count += 1
-                    self.extract_error_details(error_details, data)
-                else:
-                    bulk_success_count += 1
-                        
-            stats = {
-                "took": response.get("took"),
-                "success": bulk_error_count == 0,
-                "success-count": bulk_success_count,
-                "error-count": bulk_error_count,
-            }
-        else:
-            # Response is a BytesIO object
+        # Response is a BytesIO object - check database type
+        database_type = getattr(es, 'database_type', 'infino')
+        
+        if database_type == 'infino':
+            # Infino returns JSON string - use json.loads()
             raw_content = response.getvalue()
             if isinstance(raw_content, bytes):
                 parsed_response = json.loads(raw_content.decode('utf-8'))
             else:
                 parsed_response = json.loads(raw_content)
                     
+            for item in parsed_response.get("items", []):
+                data = next(iter(item.values()))
+                status = data.get("status", 0)
+                
+                if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                    bulk_error_count += 1
+                    self.extract_error_details(error_details, data)
+                else:
+                    bulk_success_count += 1
+
+            stats = {
+                "took": parsed_response.get("took"),
+                "success": bulk_error_count == 0,
+                "success-count": bulk_success_count,
+                "error-count": bulk_error_count,
+            }
+        else:
+            # Elasticsearch or OpenSearch - use parse() function for safe BytesIO handling
+            parsed_response = parse(response, ["took", "errors", "items"])
+            
             for item in parsed_response.get("items", []):
                 data = next(iter(item.values()))
                 status = data.get("status", 0)
