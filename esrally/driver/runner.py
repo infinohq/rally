@@ -629,9 +629,7 @@ class BulkIndex(Runner):
         error_details = set()
         
         if isinstance(response, dict):
-            # Elasticsearch dict response - original approach
-            props = parse(response, ["errors", "took"])         
-   
+            # Response is a dict
             for item in response["items"]:
                 data = next(iter(item.values()))
                 if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
@@ -641,55 +639,35 @@ class BulkIndex(Runner):
                     bulk_success_count += 1
                         
             stats = {
-                "took": props.get("took"),
+                "took": response.get("took"),
                 "success": bulk_error_count == 0,
                 "success-count": bulk_success_count,
                 "error-count": bulk_error_count,
             }
         else:
-            # BytesIO response - try Elasticsearch parsing first, fallback to Infino
-            try:
-                # Elasticsearch BytesIO response - original approach with lazy parsing
-                props = parse(response, ["errors", "took"])         
-    
-                for item in response["items"]:
-                    data = next(iter(item.values()))
-                    if data["status"] > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                        bulk_error_count += 1
-                        self.extract_error_details(error_details, data)
-                    else:
-                        bulk_success_count += 1
-                                
-                    stats = {
-                        "took": props.get("took"),
-                        "success": bulk_error_count == 0,
-                        "success-count": bulk_success_count,
-                        "error-count": bulk_error_count,
-                    }
-            except:
-                # Fallback to Infino BytesIO response parsing
-                raw_content = response.getvalue()
-                if isinstance(raw_content, bytes):
-                    parsed_response = json.loads(raw_content.decode('utf-8'))
+            # Response is a BytesIO object
+            raw_content = response.getvalue()
+            if isinstance(raw_content, bytes):
+                parsed_response = json.loads(raw_content.decode('utf-8'))
+            else:
+                parsed_response = json.loads(raw_content)
+                    
+            for item in parsed_response.get("items", []):
+                data = next(iter(item.values()))
+                status = data.get("status", 0)
+                
+                if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
+                    bulk_error_count += 1
+                    self.extract_error_details(error_details, data)
                 else:
-                    parsed_response = json.loads(raw_content)
-                    
-                for item in parsed_response.get("items", []):
-                    data = next(iter(item.values()))
-                    status = data.get("status", 0)
-                    
-                    if status > 299 or ("_shards" in data and data["_shards"]["failed"] > 0):
-                        bulk_error_count += 1
-                        self.extract_error_details(error_details, data)
-                    else:
-                        bulk_success_count += 1
+                    bulk_success_count += 1
 
-                stats = {
-                    "took": parsed_response.get("took"),
-                    "success": bulk_error_count == 0,
-                    "success-count": bulk_success_count,
-                    "error-count": bulk_error_count,
-                }
+            stats = {
+                "took": parsed_response.get("took"),
+                "success": bulk_error_count == 0,
+                "success-count": bulk_success_count,
+                "error-count": bulk_error_count,
+            }
             
         if bulk_error_count > 0:
             stats["error-type"] = "bulk"
