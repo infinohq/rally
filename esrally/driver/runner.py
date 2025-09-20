@@ -529,7 +529,8 @@ class BulkIndex(Runner):
 
         # Use simple_stats for all databases to ensure consistent parsing and throughput calculations
         # Only use detailed_stats when explicitly requested via detailed-results parameter
-        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response)
+        database_type = getattr(es, 'database_type', 'elasticsearch')
+        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response, database_type)
 
         meta_data = {
             "index": params.get("index"),
@@ -623,13 +624,12 @@ class BulkIndex(Runner):
 
         return stats
 
-    def simple_stats(self, es, bulk_size, unit, response):
+    def simple_stats(self, es, bulk_size, unit, response, database_type):
         bulk_success_count = 0
         bulk_error_count = 0
         error_details = set()
         
-        # Response is a BytesIO object - check database type
-        database_type = getattr(es, 'database_type', 'infino')
+        # Use explicitly passed database_type parameter
         
         if database_type == 'infino':
             # Infino returns JSON string - use json.loads()

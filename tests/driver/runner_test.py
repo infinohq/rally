@@ -762,6 +762,7 @@ class TestBulkIndexRunner:
     @mock.patch("elasticsearch.Elasticsearch")
     @pytest.mark.asyncio
     async def test_mixed_bulk_with_simple_stats(self, es):
+        es.database_type = "elasticsearch"
         bulk_response = {
             "took": 30,
             "ingest_took": 20,
