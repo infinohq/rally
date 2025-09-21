@@ -535,7 +535,7 @@ class RallySyncElasticsearch(Elasticsearch):
                 response_body["errors"] = False
         
         # Handle indices stats requests - Infino doesn't support /_stats, use _cat/indices instead
-        elif "/_stats" in path and method == "GET":
+        elif self.database_type == "infino" and "/_stats" in path and method == "GET":
             # Get real stats from Infino's _cat/indices API and transform to Rally format
             try:
                 # Make a direct request to _cat/indices to avoid recursion
