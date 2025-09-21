@@ -259,7 +259,8 @@ class EsClientFactory:
             self.client_options["api_key"] = api_key
 
         # Extract database_type from client options if provided
-        database_type = self.client_options.pop("database_type", "infino")
+        database_type = self.client_options.pop("database_type", "elasticsearch")
+        self.logger.debug("create_async: extracted database_type=%s from client_options=%s", database_type, list(self.client_options.keys()))
 
         async_client = RallyAsyncDatabase(
             distribution_version=self.distribution_version,

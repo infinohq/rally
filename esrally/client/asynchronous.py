@@ -327,6 +327,7 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         self.distribution_flavor = distribution_flavor
         self.database_type = database_type
         self.logger = logging.getLogger(__name__)
+        self.logger.debug("RallyAsyncDatabase.__init__: received database_type=%s", database_type)
         # Counter for bulk request progress logging
         self._bulk_request_counter = 0
 
@@ -343,6 +344,7 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         new_self = super().options(*args, **kwargs)
         new_self.distribution_version = self.distribution_version
         new_self.distribution_flavor = self.distribution_flavor
+        new_self.database_type = self.database_type
         return new_self
 
     async def perform_request(
