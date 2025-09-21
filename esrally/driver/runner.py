@@ -800,8 +800,8 @@ class IndicesStats(Runner):
         condition = params.get("condition")
         response = await es.indices.stats(index=index, metric="_all", **api_kwargs)
         
-        # Handle Infino's tuple response format (meta, body)
-        if isinstance(response, tuple) and len(response) == 2:
+        # Handle Infino's tuple response format (meta, body) - only for Infino
+        if hasattr(es, 'database_type') and es.database_type == "infino" and isinstance(response, tuple) and len(response) == 2:
             response = response[1]  # Use the body part of the tuple
         if condition:
             path = mandatory(condition, "path", repr(self))
