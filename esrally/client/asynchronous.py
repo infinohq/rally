@@ -678,9 +678,8 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         # HEAD with a 404 is returned as a normal response
         # since this is used as an 'exists' functionality.
         if not (method == "HEAD" and meta.status == 404) and (
-{{ ... }}
-            and (self._ignore_status is DEFAULT or self._ignore_status is None or meta.status not in self._ignore_status)
-        ):
+            meta.status < 200 or meta.status >= 300
+        ) and (self._ignore_status is DEFAULT or self._ignore_status is None or meta.status not in self._ignore_status):
             message = str(resp_body)
 
             # If the response is an error response try parsing
