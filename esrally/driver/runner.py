@@ -675,12 +675,9 @@ class BulkIndex(Runner):
             if hasattr(response, 'body'):
                 # It's an ObjectApiResponse - get the body dict
                 parsed_response = response.body
-                self.logger.info(f"ES BULK STATS: ObjectApiResponse body keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'not dict'}")
-                self.logger.info(f"ES BULK STATS: took={parsed_response.get('took')}, items_count={len(parsed_response.get('items', []))}")
             else:
                 # Fallback to original parse method
                 parsed_response = parse(response, ["took", "errors", "items"])
-                self.logger.info(f"ES BULK STATS: Used parse() fallback, response type={type(response)}")
             
             for item in parsed_response.get("items", []):
                 data = next(iter(item.values()))
