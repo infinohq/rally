@@ -2260,10 +2260,9 @@ class IndexStats(InternalTelemetryDevice):
 class MlBucketProcessingTime(InternalTelemetryDevice):
     serverless_status = serverless.Status.Public
 
-    def __init__(self, client, metrics_store):
+    def __init__(self, client):
         super().__init__()
         self.client = client
-        self.metrics_store = metrics_store
 
     def on_benchmark_stop(self):
         # Skip ML telemetry for Infino database
