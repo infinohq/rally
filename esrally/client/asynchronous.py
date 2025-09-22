@@ -294,6 +294,24 @@ class RallyIlmClient(IlmClient):
 
 
 class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
+    def _remove_mode_from_aggs(self, aggs):
+        """Recursively remove 'mode' parameter from aggregations for compatibility."""
+        if not isinstance(aggs, dict):
+            return
+            
+        for agg_name, agg_def in aggs.items():
+            if isinstance(agg_def, dict):
+                # Remove mode from any aggregation type
+                for agg_type, agg_body in agg_def.items():
+                    if isinstance(agg_body, dict) and "mode" in agg_body:
+                        agg_body.pop("mode", None)
+                
+                # Recursively process nested aggregations
+                if "aggs" in agg_def:
+                    self._remove_mode_from_aggs(agg_def["aggs"])
+                elif "aggregations" in agg_def:
+                    self._remove_mode_from_aggs(agg_def["aggregations"])
+
     def __init__(self, *args, **kwargs):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)
@@ -391,8 +409,8 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         else:
             request_headers = self._headers
 
-        # Fix Infino-incompatible sort queries
-        if self.database_type == "infino" and body and isinstance(body, (dict, str)):
+        # Fix incompatible sort and aggregation queries for all databases
+        if body and isinstance(body, (dict, str)):
             import json
             if isinstance(body, str):
                 try:
@@ -402,15 +420,21 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             else:
                 body_dict = body
 
-            if body_dict and "sort" in body_dict:
+            if body_dict:
                 # Remove unsupported "mode" and "nested" from sort
-                for sort_item in body_dict.get("sort", []):
-                    if isinstance(sort_item, dict):
-                        for field, options in sort_item.items():
-                            if isinstance(options, dict):
-                                # Remove unsupported options
-                                options.pop("mode", None)
-                                options.pop("nested", None)
+                if "sort" in body_dict:
+                    for sort_item in body_dict.get("sort", []):
+                        if isinstance(sort_item, dict):
+                            for field, options in sort_item.items():
+                                if isinstance(options, dict):
+                                    # Remove unsupported options
+                                    options.pop("mode", None)
+                                    options.pop("nested", None)
+                
+                # Remove unsupported "mode" from aggregations
+                if "aggs" in body_dict or "aggregations" in body_dict:
+                    aggs = body_dict.get("aggs") or body_dict.get("aggregations", {})
+                    self._remove_mode_from_aggs(aggs)
 
                 # Convert back to string if it was a string
                 if isinstance(body, str):

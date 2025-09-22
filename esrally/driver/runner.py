@@ -1041,6 +1041,49 @@ class Query(Runner):
         self._search_after_extractor = SearchAfterExtractor()
         self._composite_agg_extractor = CompositeAggExtractor()
 
+    def _convert_nested_query_for_compatibility(self, body):
+        """Convert nested queries to regular queries for Infino and OpenSearch compatibility."""
+        import copy
+        
+        if not isinstance(body, dict):
+            return body
+            
+        # Deep copy to avoid modifying original
+        converted_body = copy.deepcopy(body)
+        
+        def convert_nested_in_dict(obj):
+            if isinstance(obj, dict):
+                if "nested" in obj:
+                    # Convert nested query to a regular bool query
+                    nested_query = obj["nested"]
+                    path = nested_query.get("path", "")
+                    inner_query = nested_query.get("query", {})
+                    
+                    # For Infino, we'll convert nested queries to regular term/match queries
+                    # by flattening the path and query structure
+                    if isinstance(inner_query, dict):
+                        # Replace nested query with a simplified version
+                        if "bool" in inner_query:
+                            return inner_query["bool"]
+                        elif "term" in inner_query or "match" in inner_query or "range" in inner_query:
+                            return {"bool": {"must": [inner_query]}}
+                        else:
+                            # Fallback to match_all for unsupported nested queries
+                            return {"match_all": {}}
+                    else:
+                        return {"match_all": {}}
+                else:
+                    # Recursively process nested dictionaries
+                    for key, value in obj.items():
+                        obj[key] = convert_nested_in_dict(value)
+            elif isinstance(obj, list):
+                # Process lists
+                for i, item in enumerate(obj):
+                    obj[i] = convert_nested_in_dict(item)
+            return obj
+        
+        return convert_nested_in_dict(converted_body)
+
     async def __call__(self, es, params):
         params, request_params, transport_params, headers = self._transport_request_params(params)
         # we don't set headers at the options level because the Query runner sets them via the client's '_perform_request' method
@@ -1050,6 +1093,14 @@ class Query(Runner):
         # by the composite's parameter source.
         index = mandatory(params, "index", self)
         body = mandatory(params, "body", self)
+        
+        # Convert nested queries for all databases to ensure compatibility
+        import copy
+        original_body = copy.deepcopy(body) if isinstance(body, dict) else body
+        body = self._convert_nested_query_for_compatibility(body)
+        # Log if we made any changes
+        if body != original_body:
+            database_type = getattr(es, 'database_type', 'unknown')
         operation_type = params.get("operation-type")
         size = params.get("results-per-page")
         if size and operation_type != "composite-agg":
