@@ -520,6 +520,10 @@ class BulkIndex(Runner):
         if not detailed_results:
             es.return_raw_response()
 
+        # Measure timing ourselves since Elasticsearch's timer is broken
+        import time
+        start_time = time.perf_counter()
+
         if with_action_metadata:
             api_kwargs.pop("index", None)
             # only half of the lines are documents
@@ -527,10 +531,14 @@ class BulkIndex(Runner):
         else:
             response = await es.bulk(doc_type=params.get("type"), params=bulk_params, **api_kwargs)
 
+        # Calculate actual elapsed time in milliseconds
+        end_time = time.perf_counter()
+        client_measured_ms = (end_time - start_time) * 1000
+
         # Use simple_stats for all databases to ensure consistent parsing and throughput calculations
         # Only use detailed_stats when explicitly requested via detailed-results parameter
         database_type = getattr(es, 'database_type', 'elasticsearch')
-        stats = self.detailed_stats(params, response) if detailed_results else self.simple_stats(es, bulk_size, unit, response, database_type)
+        stats = self.detailed_stats(params, response, client_measured_ms) if detailed_results else self.simple_stats(es, bulk_size, unit, response, database_type, client_measured_ms)
 
         meta_data = {
             "index": params.get("index"),
@@ -542,7 +550,7 @@ class BulkIndex(Runner):
             meta_data["error-type"] = "bulk"
         return meta_data
 
-    def detailed_stats(self, params, response):
+    def detailed_stats(self, params, response, client_measured_ms=None):
         def _utf8len(line):
             if isinstance(line, bytes):
                 return len(line)
@@ -598,7 +606,13 @@ class BulkIndex(Runner):
             else:
                 bulk_success_count += 1
         # Calculate throughput for consistent metrics with Infino
-        took_ms = response.get("took", 0)
+        # ALWAYS use client-measured timing since server timing is unreliable
+        server_took = response.get("took", 0)
+        took_ms = client_measured_ms if client_measured_ms is not None else server_took
+
+        if client_measured_ms is not None:
+            self.logger.info(f"DETAILED BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
+
         throughput = None
         if took_ms > 0 and bulk_success_count > 0:
             # Convert milliseconds to seconds and calculate docs/s
@@ -624,7 +638,7 @@ class BulkIndex(Runner):
 
         return stats
 
-    def simple_stats(self, es, bulk_size, unit, response, database_type):
+    def simple_stats(self, es, bulk_size, unit, response, database_type, client_measured_ms=None):
         bulk_success_count = 0
         bulk_error_count = 0
         error_details = set()
@@ -649,15 +663,30 @@ class BulkIndex(Runner):
                 else:
                     bulk_success_count += 1
 
+            # ALWAYS use client-measured timing for ALL databases since server timing is unreliable
+            server_took = parsed_response.get("took")
+            actual_took = client_measured_ms if client_measured_ms is not None else server_took
+
+            if client_measured_ms is not None:
+                self.logger.info(f"BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
+
             stats = {
-                "took": parsed_response.get("took"),
+                "took": actual_took,
                 "success": bulk_error_count == 0,
                 "success-count": bulk_success_count,
                 "error-count": bulk_error_count,
             }
         else:
-            # Elasticsearch or OpenSearch - use parse() function for safe BytesIO handling
-            parsed_response = parse(response, ["took", "errors", "items"])
+            # Elasticsearch or OpenSearch - handle ObjectApiResponse
+            if hasattr(response, 'body'):
+                # It's an ObjectApiResponse - get the body dict
+                parsed_response = response.body
+                self.logger.info(f"ES BULK STATS: ObjectApiResponse body keys: {list(parsed_response.keys()) if isinstance(parsed_response, dict) else 'not dict'}")
+                self.logger.info(f"ES BULK STATS: took={parsed_response.get('took')}, items_count={len(parsed_response.get('items', []))}")
+            else:
+                # Fallback to original parse method
+                parsed_response = parse(response, ["took", "errors", "items"])
+                self.logger.info(f"ES BULK STATS: Used parse() fallback, response type={type(response)}")
             
             for item in parsed_response.get("items", []):
                 data = next(iter(item.values()))
@@ -669,8 +698,15 @@ class BulkIndex(Runner):
                 else:
                     bulk_success_count += 1
 
+            # ALWAYS use client-measured timing for ALL databases since server timing is unreliable
+            server_took = parsed_response.get("took")
+            actual_took = client_measured_ms if client_measured_ms is not None else server_took
+
+            if client_measured_ms is not None:
+                self.logger.info(f"BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
+
             stats = {
-                "took": parsed_response.get("took"),
+                "took": actual_took,
                 "success": bulk_error_count == 0,
                 "success-count": bulk_success_count,
                 "error-count": bulk_error_count,

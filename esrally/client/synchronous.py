@@ -217,6 +217,21 @@ class RallySyncElasticsearch(Elasticsearch):
         # Skip product verification for non-Elasticsearch databases
         if self._verified_elasticsearch is None:
             if self.database_type == "elasticsearch":
+                # For Infino, ensure headers include authentication
+                if self.database_type == "infino":
+                    infino_headers = {
+                        "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
+                        "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VYTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+                        "x-infino-client-id": "rally-client",
+                        "x-infino-account-id": "000000000000",
+                        "x-infino-thread-id": "rally-thread",
+                        "x-infino-username": "admin",
+                        "x-opensearch-product-origin": "opensearch-dashboards",
+                        "content-type": "application/json",
+                    }
+                    request_headers = request_headers.copy()
+                    request_headers.update(infino_headers)
+
                 info = self.transport.perform_request(method="GET", target="/", headers=request_headers)
                 info_meta = info.meta
                 info_body = info.body
@@ -274,6 +289,33 @@ class RallySyncElasticsearch(Elasticsearch):
                 method = "POST"
             routed_headers["content-type"] = "application/x-ndjson"
 
+        # Fix Infino-incompatible sort queries
+        if self.database_type == "infino" and routed_body and isinstance(routed_body, (dict, str)):
+            import json
+            if isinstance(routed_body, str):
+                try:
+                    body_dict = json.loads(routed_body)
+                except:
+                    body_dict = None
+            else:
+                body_dict = routed_body
+
+            if body_dict and "sort" in body_dict:
+                # Remove unsupported "mode" and "nested" from sort
+                for sort_item in body_dict.get("sort", []):
+                    if isinstance(sort_item, dict):
+                        for field, options in sort_item.items():
+                            if isinstance(options, dict):
+                                # Remove unsupported options
+                                options.pop("mode", None)
+                                options.pop("nested", None)
+
+                # Convert back to string if it was a string
+                if isinstance(routed_body, str):
+                    routed_body = json.dumps(body_dict)
+                else:
+                    routed_body = body_dict
+
         # Handle params compatibility - newer elasticsearch-py doesn't accept params as kwarg
         if routed_params:
             # Merge params into the target URL
@@ -304,11 +346,13 @@ class RallySyncElasticsearch(Elasticsearch):
                 if isinstance(response_body, str) and len(response_body) < 500:
                     self.logger.debug(f"INFINO SEARCH RESPONSE: {response_body}")
             
-            # Transform response based on database type
-            transformed_body = self._transform_response(method, routed_path, response_body)
-            
-            # Return the transformed body directly since response.body is read-only
-            return transformed_body
+            # Transform response only for Infino
+            if self.database_type == "infino":
+                transformed_body = self._transform_response(method, routed_path, response_body)
+                return transformed_body
+            else:
+                # For Elasticsearch and OpenSearch, return response as-is
+                return response_body
                 
         except Exception as e:
             # Enhanced error logging for search operations
@@ -539,9 +583,21 @@ class RallySyncElasticsearch(Elasticsearch):
             # Get real stats from Infino's _cat/indices API and transform to Rally format
             try:
                 # Make a direct request to _cat/indices to avoid recursion
+                # Ensure Infino headers are included for direct transport call
+                infino_headers = {
+                    "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
+                    "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VYTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+                    "x-infino-client-id": "rally-client",
+                    "x-infino-account-id": "000000000000",
+                    "x-infino-thread-id": "rally-thread",
+                    "x-infino-username": "admin",
+                    "x-opensearch-product-origin": "opensearch-dashboards",
+                    "content-type": "application/json",
+                }
                 cat_resp = self.transport.perform_request(
-                    method="GET", 
+                    method="GET",
                     target="/_cat/indices",
+                    headers=infino_headers,
                 )
                 cat_data = cat_resp.body if hasattr(cat_resp, 'body') else cat_resp
                 

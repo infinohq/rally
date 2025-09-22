@@ -391,6 +391,33 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         else:
             request_headers = self._headers
 
+        # Fix Infino-incompatible sort queries
+        if self.database_type == "infino" and body and isinstance(body, (dict, str)):
+            import json
+            if isinstance(body, str):
+                try:
+                    body_dict = json.loads(body)
+                except:
+                    body_dict = None
+            else:
+                body_dict = body
+
+            if body_dict and "sort" in body_dict:
+                # Remove unsupported "mode" and "nested" from sort
+                for sort_item in body_dict.get("sort", []):
+                    if isinstance(sort_item, dict):
+                        for field, options in sort_item.items():
+                            if isinstance(options, dict):
+                                # Remove unsupported options
+                                options.pop("mode", None)
+                                options.pop("nested", None)
+
+                # Convert back to string if it was a string
+                if isinstance(body, str):
+                    body = json.dumps(body_dict)
+                else:
+                    body = body_dict
+
         # Converts all parts of a Accept/Content-Type headers
         # from application/X -> application/vnd.elasticsearch+X
         # see https://github.com/elastic/elasticsearch/issues/51816
@@ -439,10 +466,21 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         if self.database_type == "infino" and method == "GET" and "/_stats" in path:
             try:
                 # Get real stats from Infino's _cat/indices API
+                # Ensure Infino headers are included for direct transport call
+                infino_headers = {
+                    "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
+                    "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VYTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+                    "x-infino-client-id": "rally-client",
+                    "x-infino-account-id": "000000000000",
+                    "x-infino-thread-id": "rally-thread",
+                    "x-infino-username": "admin",
+                    "x-opensearch-product-origin": "opensearch-dashboards",
+                    "content-type": "application/json",
+                }
                 cat_meta, cat_body = await self.transport.perform_request(
                     method="GET",
                     target="/_cat/indices",
-                    headers=request_headers,
+                    headers=infino_headers,
                     body=None,
                     request_timeout=self._request_timeout,
                     max_retries=self._max_retries,
