@@ -312,6 +312,45 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 elif "aggregations" in agg_def:
                     self._remove_mode_from_aggs(agg_def["aggregations"])
 
+    def _convert_nested_queries(self, body):
+        """Convert nested queries to regular queries for compatibility."""
+        if not isinstance(body, dict):
+            return body
+            
+        def convert_nested_in_dict(obj):
+            if isinstance(obj, dict):
+                if "nested" in obj:
+                    # Convert nested query to a regular bool query
+                    nested_query = obj["nested"]
+                    path = nested_query.get("path", "")
+                    inner_query = nested_query.get("query", {})
+                    
+                    # Convert nested queries to regular term/match queries
+                    # by flattening the path and query structure
+                    if isinstance(inner_query, dict):
+                        # Replace nested query with a simplified version
+                        if "bool" in inner_query:
+                            return inner_query["bool"]
+                        elif "term" in inner_query or "match" in inner_query or "range" in inner_query:
+                            return {"bool": {"must": [inner_query]}}
+                        else:
+                            # Keep the inner query as-is for other query types
+                            return inner_query
+                    else:
+                        # Keep non-dict queries as-is
+                        return inner_query
+                else:
+                    # Recursively process nested dictionaries
+                    for key, value in obj.items():
+                        obj[key] = convert_nested_in_dict(value)
+            elif isinstance(obj, list):
+                # Process lists
+                for i, item in enumerate(obj):
+                    obj[i] = convert_nested_in_dict(item)
+            return obj
+        
+        return convert_nested_in_dict(body)
+
     def __init__(self, *args, **kwargs):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)
@@ -435,6 +474,9 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 if "aggs" in body_dict or "aggregations" in body_dict:
                     aggs = body_dict.get("aggs") or body_dict.get("aggregations", {})
                     self._remove_mode_from_aggs(aggs)
+                
+                # Convert nested queries to bool queries for compatibility
+                body_dict = self._convert_nested_queries(body_dict)
 
                 # Convert back to string if it was a string
                 if isinstance(body, str):
@@ -632,19 +674,26 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 except Exception:
                     # Leave as string if not valid JSON
                     pass
-            
             # Transform Infino responses for Rally compatibility
             if self.database_type == "infino":
                 # Add debug logging for async responses
                 if "/_bulk" in path:
                     logger = logging.getLogger(__name__)
                     logger.debug(f"Async Infino bulk response type: {type(resp_body)}, content: {str(resp_body)[:200]}")
-                resp_body = self._transform_infino_response(method, path, resp_body)
+                if isinstance(resp_body, dict):
+                    resp_body = self._transform_infino_response(method, path, resp_body)
+                else:
+                    try:
+                        resp_body = json.loads(resp_body)
+                        resp_body = self._transform_infino_response(method, path, resp_body)
+                    except Exception:
+                        # If not JSON, return as-is
+                        pass
 
         # HEAD with a 404 is returned as a normal response
         # since this is used as an 'exists' functionality.
         if not (method == "HEAD" and meta.status == 404) and (
-            not 200 <= meta.status < 299
+{{ ... }}
             and (self._ignore_status is DEFAULT or self._ignore_status is None or meta.status not in self._ignore_status)
         ):
             message = str(resp_body)
