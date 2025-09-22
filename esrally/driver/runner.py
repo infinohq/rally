@@ -828,13 +828,6 @@ class IndicesStats(Runner):
         if hasattr(es, 'database_type') and es.database_type == "infino" and isinstance(response, tuple) and len(response) == 2:
             response = response[1]  # Use the body part of the tuple
         
-        # DEBUG: Log response details for debugging merge issue
-        if hasattr(es, 'database_type'):
-            self.logger.info(f"RALLY DEBUG INDICES-STATS: database_type={es.database_type}, response_type={type(response)}")
-            if isinstance(response, dict) and '_all' in response:
-                merges = response.get('_all', {}).get('total', {}).get('merges', {})
-                self.logger.info(f"RALLY DEBUG INDICES-STATS: merges={merges}")
-        
         if condition:
             path = mandatory(condition, "path", repr(self))
             expected_value = mandatory(condition, "expected-value", repr(self))

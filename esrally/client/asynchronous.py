@@ -413,9 +413,6 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
-        # DEBUG: Log all requests for Infino (skip bulk operations to reduce noise)
-        if self.database_type == "infino" and "/_bulk" not in path:
-            self.logger.info(f"RALLY DEBUG: {method} {path} (params: {params})")
         # Detect if Rally requested a raw response (used by bulk fast path)
         try:
             ctx = RequestContextHolder.request_context.get()
@@ -649,19 +646,7 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 retry_on_timeout=self._retry_on_timeout,
                 client_meta=self._client_meta,
             )
-            # DEBUG: Log response for Infino (skip bulk operations to reduce noise)
-            if self.database_type == "infino" and "/_bulk" not in target:
-                self.logger.info(f"RALLY DEBUG: Response {meta.status} for {method} {target}")
-                if hasattr(meta, 'headers'):
-                    self.logger.info(f"RALLY DEBUG: Response headers: {dict(meta.headers)}")
-                self.logger.info(f"RALLY DEBUG: Response body type: {type(resp_body)}")
-                if isinstance(resp_body, str) and len(resp_body) < 500:
-                    self.logger.info(f"RALLY DEBUG: Response body: {resp_body}")
         except Exception as e:
-            # DEBUG: Log errors for Infino
-            if self.database_type == "infino":
-                self.logger.error(f"RALLY DEBUG: Error for {method} {target}: {e}")
-                self.logger.error(f"RALLY DEBUG: Error type: {type(e)}")
             raise
 
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.

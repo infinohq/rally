@@ -186,9 +186,6 @@ class RallySyncElasticsearch(Elasticsearch):
         headers: Optional[Mapping[str, str]] = None,
         body: Optional[Any] = None,
     ) -> ApiResponse[Any]:
-        # DEBUG: Log all requests for Infino (skip bulk operations to reduce noise)
-        if self.database_type == "infino" and "/_bulk" not in path:
-            self.logger.info(f"RALLY DEBUG SYNC: {method} {path} (params: {params})")
         # We need to ensure that we provide content-type and accept headers
         if body is not None:
             if headers is None:
@@ -327,24 +324,8 @@ class RallySyncElasticsearch(Elasticsearch):
                 routed_path = f"{routed_path}?{param_string}"
         
         try:
-            self.logger.debug(f"INFINO REQUEST: About to execute {method} {routed_path}")
-            self.logger.debug(f"INFINO REQUEST: Headers being sent: {routed_headers}")
             response = self.transport.perform_request(method=method, target=routed_path, headers=routed_headers, body=routed_body)
             response_body = response.body if hasattr(response, 'body') else response
-            
-            # DEBUG: Log response for Infino (skip bulk operations to reduce noise)
-            if self.database_type == "infino" and "/_bulk" not in routed_path:
-                self.logger.info(f"RALLY DEBUG SYNC: Response {response.meta.status if hasattr(response, 'meta') else 'unknown'} for {method} {routed_path}")
-                self.logger.info(f"RALLY DEBUG SYNC: Response body type: {type(response_body)}")
-                if isinstance(response_body, str) and len(response_body) < 500:
-                    self.logger.info(f"RALLY DEBUG SYNC: Response body: {response_body}")
-            
-            # Log successful responses for search operations
-            if "/_search" in routed_path:
-                self.logger.debug(f"INFINO SEARCH SUCCESS: {method} {routed_path}")
-                self.logger.debug(f"INFINO SEARCH RESPONSE TYPE: {type(response_body)}")
-                if isinstance(response_body, str) and len(response_body) < 500:
-                    self.logger.debug(f"INFINO SEARCH RESPONSE: {response_body}")
             
             # Transform response only for Infino
             if self.database_type == "infino":
@@ -357,13 +338,13 @@ class RallySyncElasticsearch(Elasticsearch):
         except Exception as e:
             # Enhanced error logging for search operations
             if "/_search" in routed_path:
-                self.logger.error(f"INFINO SEARCH FAILED: {method} {routed_path}")
-                self.logger.error(f"INFINO SEARCH ERROR: {str(e)}")
-                self.logger.error(f"INFINO SEARCH ERROR TYPE: {type(e)}")
+                self.logger.error(f"SEARCH FAILED: {method} {routed_path}")
+                self.logger.error(f"SEARCH ERROR: {str(e)}")
+                self.logger.error(f"SEARCH ERROR TYPE: {type(e)}")
                 if hasattr(e, 'status_code'):
-                    self.logger.error(f"INFINO SEARCH HTTP STATUS: {e.status_code}")
+                    self.logger.error(f"SEARCH HTTP STATUS: {e.status_code}")
                 if hasattr(e, 'body'):
-                    self.logger.error(f"INFINO SEARCH ERROR BODY: {e.body}")
+                    self.logger.error(f"SEARCH ERROR BODY: {e.body}")
             else:
                 self.logger.error(f"Request failed: {method} {routed_path} - {str(e)}")
             
