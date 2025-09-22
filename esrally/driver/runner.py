@@ -1061,10 +1061,10 @@ class Query(Runner):
                         elif "term" in inner_query or "match" in inner_query or "range" in inner_query:
                             return {"bool": {"must": [inner_query]}}
                         else:
-                            # Fallback to match_all for unsupported nested queries
-                            return {"match_all": {}}
+                            # Keep the inner query as-is for other query types
+                            return inner_query
                     else:
-                        return {"match_all": {}}
+                        return inner_query
                 else:
                     # Recursively process nested dictionaries
                     for key, value in obj.items():
