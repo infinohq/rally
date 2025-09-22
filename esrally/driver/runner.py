@@ -610,9 +610,6 @@ class BulkIndex(Runner):
         server_took = response.get("took", 0)
         took_ms = client_measured_ms if client_measured_ms is not None else server_took
 
-        if client_measured_ms is not None:
-            self.logger.info(f"DETAILED BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
-
         throughput = None
         if took_ms > 0 and bulk_success_count > 0:
             # Convert milliseconds to seconds and calculate docs/s
@@ -667,9 +664,6 @@ class BulkIndex(Runner):
             server_took = parsed_response.get("took")
             actual_took = client_measured_ms if client_measured_ms is not None else server_took
 
-            if client_measured_ms is not None:
-                self.logger.info(f"BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
-
             stats = {
                 "took": actual_took,
                 "success": bulk_error_count == 0,
@@ -701,9 +695,6 @@ class BulkIndex(Runner):
             # ALWAYS use client-measured timing for ALL databases since server timing is unreliable
             server_took = parsed_response.get("took")
             actual_took = client_measured_ms if client_measured_ms is not None else server_took
-
-            if client_measured_ms is not None:
-                self.logger.info(f"BULK TIMING: Using client-measured {client_measured_ms:.2f}ms (server reported {server_took}ms)")
 
             stats = {
                 "took": actual_took,
