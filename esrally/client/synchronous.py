@@ -326,8 +326,8 @@ class RallySyncElasticsearch(Elasticsearch):
             routed_headers["content-type"] = "application/x-ndjson"
 
         # Fix Infino-incompatible sort queries
-        # Fix incompatible sort and nested queries for all databases
-        if routed_body and isinstance(routed_body, (dict, str)):
+        # Fix incompatible sort and nested queries for search operations only
+        if routed_body and isinstance(routed_body, (dict, str)) and ("/_search" in routed_path or "/search" in routed_path):
             import json
             if isinstance(routed_body, str):
                 try:

@@ -445,8 +445,8 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         else:
             request_headers = self._headers
 
-        # Fix incompatible sort and aggregation queries for all databases
-        if body and isinstance(body, (dict, str)):
+        # Fix incompatible sort and aggregation queries for search operations only
+        if body and isinstance(body, (dict, str)) and ("/_search" in path or "/search" in path):
             import json
             if isinstance(body, str):
                 try:
