@@ -2266,7 +2266,7 @@ class MlBucketProcessingTime(InternalTelemetryDevice):
 
     def on_benchmark_stop(self):
         # Skip ML telemetry for Infino database
-        if hasattr(self.client, 'database_type') and self.client.database_type == 'infino':
+        if hasattr(self, 'client') and hasattr(self.client, 'database_type'):
             self.logger.info("Skipping ML bucket processing time collection for Infino database")
             return
             

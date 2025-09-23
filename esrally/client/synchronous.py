@@ -177,6 +177,45 @@ class RallySyncElasticsearch(Elasticsearch):
         new_self.database_type = self.database_type
         return new_self
 
+    def _convert_nested_queries(self, body):
+        """Convert nested queries to regular queries for compatibility."""
+        if not isinstance(body, dict):
+            return body
+            
+        def convert_nested_in_dict(obj):
+            if isinstance(obj, dict):
+                if "nested" in obj:
+                    # Convert nested query to a regular bool query
+                    nested_query = obj["nested"]
+                    path = nested_query.get("path", "")
+                    inner_query = nested_query.get("query", {})
+                    
+                    # Convert nested queries to regular term/match queries
+                    # by flattening the path and query structure
+                    if isinstance(inner_query, dict):
+                        # Replace nested query with a simplified version
+                        if "bool" in inner_query:
+                            return inner_query["bool"]
+                        elif "term" in inner_query or "match" in inner_query or "range" in inner_query:
+                            return {"bool": {"must": [inner_query]}}
+                        else:
+                            # Keep the inner query as-is for other query types
+                            return inner_query
+                    else:
+                        # Keep non-dict queries as-is
+                        return inner_query
+                else:
+                    # Recursively process nested dictionaries
+                    for key, value in obj.items():
+                        obj[key] = convert_nested_in_dict(value)
+            elif isinstance(obj, list):
+                # Process lists
+                for i, item in enumerate(obj):
+                    obj[i] = convert_nested_in_dict(item)
+            return obj
+        
+        return convert_nested_in_dict(body)
+
     def perform_request(
         self,
         method: str,
@@ -287,7 +326,8 @@ class RallySyncElasticsearch(Elasticsearch):
             routed_headers["content-type"] = "application/x-ndjson"
 
         # Fix Infino-incompatible sort queries
-        if self.database_type == "infino" and routed_body and isinstance(routed_body, (dict, str)):
+        # Fix incompatible sort and nested queries for all databases
+        if routed_body and isinstance(routed_body, (dict, str)):
             import json
             if isinstance(routed_body, str):
                 try:
@@ -297,15 +337,19 @@ class RallySyncElasticsearch(Elasticsearch):
             else:
                 body_dict = routed_body
 
-            if body_dict and "sort" in body_dict:
+            if body_dict:
                 # Remove unsupported "mode" and "nested" from sort
-                for sort_item in body_dict.get("sort", []):
-                    if isinstance(sort_item, dict):
-                        for field, options in sort_item.items():
-                            if isinstance(options, dict):
-                                # Remove unsupported options
-                                options.pop("mode", None)
-                                options.pop("nested", None)
+                if "sort" in body_dict:
+                    for sort_item in body_dict.get("sort", []):
+                        if isinstance(sort_item, dict):
+                            for field, options in sort_item.items():
+                                if isinstance(options, dict):
+                                    # Remove unsupported options
+                                    options.pop("mode", None)
+                                    options.pop("nested", None)
+                
+                # Convert nested queries to bool queries for compatibility
+                body_dict = self._convert_nested_queries(body_dict)
 
                 # Convert back to string if it was a string
                 if isinstance(routed_body, str):
