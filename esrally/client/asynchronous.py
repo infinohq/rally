@@ -632,21 +632,10 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             if self._bulk_request_counter % 100 == 0:
                 self.logger.info(f"Async bulk request progress for {self.database_type}: {self._bulk_request_counter} requests completed")
 
-        try:
-            if self.database_type == "infino":
-                self.logger.info(f"INFINO SENDING: {method} {path}")
-                self.logger.info(f"INFINO HEADERS: {request_headers}")
-                if body:
-                    self.logger.info(f"INFINO BODY: {str(body)[:200]}...")
-            
+        try:            
             meta, resp_body = await self.transport.perform_request(
                 method=method, target=path, headers=request_headers, body=body
-            )
-            
-            if self.database_type == "infino":
-                self.logger.info(f"INFINO RESPONSE: Status={meta.status}, Headers={dict(meta.headers)}")
-                self.logger.info(f"INFINO RESPONSE BODY: {str(resp_body)[:200]}...")
-                
+            )    
         except Exception as e:
             if self.database_type == "infino":
                 self.logger.error(f"INFINO ERROR - Request failed: {method} {path}, Error: {str(e)}, Type: {type(e)}")
