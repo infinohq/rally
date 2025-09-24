@@ -491,18 +491,16 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             ):
                 _mimetype_header_to_compat("Accept", request_headers)
                 _mimetype_header_to_compat("Content-Type", request_headers)
-        elif self.database_type == "opensearch":
-            # OpenSearch needs standard headers, not the Elasticsearch 8.x format
-            # Just ensure the headers are set to standard values
-            if "content-type" not in request_headers:
-                request_headers["content-type"] = "application/json"
-            if "accept" not in request_headers:
-                request_headers["accept"] = "application/json"
         elif self.database_type == "infino":
             # Infino needs standard headers, not the Elasticsearch 8.x format
             # Just ensure Content-Type is set to standard value (no Accept header)
             if "content-type" not in request_headers:
                 request_headers["content-type"] = "application/json"
+        else:
+            if headers.get("content-type") is None:
+                headers["content-type"] = "application/json"
+            if headers.get("accept") is None:
+                headers["accept"] = "application/json"
 
         # Infino does not support /_cluster/health/{index}; rewrite to cluster-level health
         if self.database_type == "infino" and method == "GET" and path.startswith("/_cluster/health/"):
@@ -635,18 +633,23 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 self.logger.info(f"Async bulk request progress for {self.database_type}: {self._bulk_request_counter} requests completed")
 
         try:
+            if self.database_type == "infino":
+                self.logger.info(f"INFINO SENDING: {method} {path}")
+                self.logger.info(f"INFINO HEADERS: {request_headers}")
+                if body:
+                    self.logger.info(f"INFINO BODY: {str(body)[:200]}...")
+            
             meta, resp_body = await self.transport.perform_request(
-                method,
-                target,
-                headers=request_headers,
-                body=body,
-                request_timeout=self._request_timeout,
-                max_retries=self._max_retries,
-                retry_on_status=self._retry_on_status,
-                retry_on_timeout=self._retry_on_timeout,
-                client_meta=self._client_meta,
+                method=method, target=path, headers=request_headers, body=body
             )
+            
+            if self.database_type == "infino":
+                self.logger.info(f"INFINO RESPONSE: Status={meta.status}, Headers={dict(meta.headers)}")
+                self.logger.info(f"INFINO RESPONSE BODY: {str(resp_body)[:200]}...")
+                
         except Exception as e:
+            if self.database_type == "infino":
+                self.logger.error(f"INFINO ERROR - Request failed: {method} {path}, Error: {str(e)}, Type: {type(e)}")
             raise
 
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
