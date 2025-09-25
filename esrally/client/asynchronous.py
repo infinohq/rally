@@ -383,6 +383,9 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         self.distribution_version = distribution_version
         self.distribution_flavor = distribution_flavor
         self.database_type = database_type
+
+        # The headers are already passed to the parent class via kwargs
+        # No need to set them again
         self.logger = logging.getLogger(__name__)
         self.logger.debug("RallyAsyncDatabase.__init__: received database_type=%s", database_type)
         # Counter for bulk request progress logging
@@ -396,6 +399,29 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
     @property
     def is_serverless(self):
         return versions.is_serverless(self.distribution_flavor)
+
+    async def bulk(self, *args, **kwargs):
+        """Override bulk to ensure Infino headers are included"""
+        if self.database_type == "infino":
+            # Make sure headers are included for Infino
+            if 'headers' not in kwargs:
+                kwargs['headers'] = {}
+
+            infino_headers = {
+                "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
+                "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VZTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+                "x-infino-client-id": "rally-client",
+                "x-infino-account-id": "000000000000",
+                "x-infino-thread-id": "rally-thread",
+                "x-infino-username": "admin",
+                "x-opensearch-product-origin": "opensearch-dashboards",
+                "content-type": "application/x-ndjson",
+            }
+            kwargs['headers'].update(infino_headers)
+
+            self.logger.debug("Infino bulk request with headers: %s", kwargs['headers'])
+
+        return await super().bulk(*args, **kwargs)
 
     def options(self, *args, **kwargs):
         new_self = super().options(*args, **kwargs)
@@ -437,13 +463,37 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             headers["content-type"] = "application/json"
             if self.database_type == "opensearch":
                 headers["accept"] = "application/json"
-            # Note: Infino auth headers are now set globally in constructor
 
-        if headers:
-            request_headers = self._headers.copy()
-            request_headers.update(headers)
-        else:
-            request_headers = self._headers
+        # For Infino, add authentication headers to every request
+        if self.database_type == "infino":
+            if headers is None:
+                headers = {}
+            headers["content-type"] = "application/json"
+            # Add Infino authentication headers
+            infino_headers = {
+                "Authorization": "Basic YWRtaW46RWVueS1tZWVueS1teW5pLW0w",
+                "x-infino-client-cert": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM0akNDQWNxZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFEREJkVFpXeG0KTFVOcFoyNWxaQ0JEWlhKMGFXWnBZMkYwWlRBZUZ3MHlOVEF6TVRBd016UTBNREphRncweU5qQXpNVEF3TXpRMApNREphTUNJeElEQWVCZ05WQkFNTUYxTmxiR1l0VTJsbmJtVmtJRU5sY25ScFptbGpZWFJsTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBazd5M1FUNVIzQVRQNGx2elNzOXJJVGdOK2lGOTVFN3cKQ014QTlFcVc2bnRWRldBeEhzcCtqSDBEdUljS1pqeWNpQngrZnZIbmtqOTJsL21ZUjBIdGhVOUJKcElITFdUYQpJR2Q4YkZSTVdSOUF3RU1BNWluTVJQNVRZQS9xOE11YVc1Mmttb3M1MjAwTnVNMjVhaG9ueVBwb0ZKTnRZYmRhClhJeTZjd1kyMlVvSjBDa0R3cDR3U3hPMnprWFcwVlRrbkdLVXkyUXp6cWMzTTQxTzF2VDBXalp2UTlscmYzbEMKTFVISlNLL2luQlBIdG1IR1c0TndmTVg4U3UxSGpucFUyd0ZHSmk3TTUrNk5XMnBQZkd2Z1F2OHEvOG5qRUFrTgptUk9QWE5XYkNzTUllamF1WmxsbmxId3k4N1crNTJQTVRQWFhjdWlYS3l6WXVXMm9VZTJGZ1FJREFRQUJveU13CklUQWZCZ05WSFJFRUdEQVdnaFJoWTJOdmRXNTBPakF3TURBd01EQXdNREF3TURBTkJna3Foa2lHOXcwQkFRc0YKQUFPQ0FRRUFpaWJ2cjF5UVpVMmttRFBUbStZRkRlZ1VVaXZFckNYTkhhM3ZKWkhvU2N4WlZ5WWpwNzA5ZC96LwpNL3dubWFIRXU4RmVibTd0b1VVdERuN3R3MjBkRXZvTi9jV1RGQVhMYndJdXQxQmh0L0p1TGJrcUhUWVBCa3IvCjg0eHlzaWRVWVlCMC95eVVCaWRGTlVCbmc2R1RSYWMrV0dSVWtveGx6Ymw5WWpiOXF3QzNtSDNxb245azVZb2sKL2xqS29nZVpPTiswdUdIZExZM3FLVXN5QmE0UGpDK3dJWGY4Y1B2eHZlS1picUFZM002RFMzWUp6WWEyN05QVQozNFdEUCs2cSsraUJCRVFVbHZtTGovWmtZM1JSRlJpVXU2cFlPYlgvWjVFNzExMWFwQ0xiSnRYaVlWU3l4bzBKCnlVcUprdHBoTzZHTjAvNEJ1UmN4cnh5RkN1L0JWUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+                "x-infino-client-id": "rally-client",
+                "x-infino-account-id": "000000000000",
+                "x-infino-thread-id": "rally-thread",
+                "x-infino-username": "admin",
+                "x-opensearch-product-origin": "opensearch-dashboards",
+            }
+            headers.update(infino_headers)
+
+            # Fix method for bulk operations
+            if "/_bulk" in path:
+                method = "POST"
+                headers["content-type"] = "application/x-ndjson"
+
+        # Debug logging for Infino
+        if self.database_type == "infino":
+            self.logger.info("INFINO REQUEST - Path: %s, Method: %s", path, method)
+            self.logger.info("INFINO REQUEST - Headers: %s", dict(headers) if headers else "None")
+            if body and "/_bulk" in path:
+                # Log first 200 chars of bulk body
+                body_str = str(body)[:200] if body else "None"
+                self.logger.info("INFINO BULK REQUEST - Body preview: %s", body_str)
 
         # Fix incompatible sort and aggregation queries for search operations only
         if body and isinstance(body, (dict, str)) and ("/_search" in path or "/search" in path):
@@ -489,13 +539,13 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             if versions.is_version_identifier(self.distribution_version) and (
                 versions.Version.from_string(self.distribution_version) >= versions.Version.from_string("8.0.0")
             ):
-                _mimetype_header_to_compat("Accept", request_headers)
-                _mimetype_header_to_compat("Content-Type", request_headers)
+                _mimetype_header_to_compat("Accept", headers)
+                _mimetype_header_to_compat("Content-Type", headers)
         elif self.database_type == "infino":
             # Infino needs standard headers, not the Elasticsearch 8.x format
             # Just ensure Content-Type is set to standard value (no Accept header)
-            if "content-type" not in request_headers:
-                request_headers["content-type"] = "application/json"
+            if "content-type" not in headers:
+                headers["content-type"] = "application/json"
         else:
             if headers.get("content-type") is None:
                 headers["content-type"] = "application/json"
@@ -516,12 +566,6 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         if self.database_type == "infino" and params:
             params = {}
 
-        # Infino requires POST for bulk and NDJSON content type
-        if self.database_type == "infino" and "/_bulk" in path:
-            if method != "POST":
-                method = "POST"
-            # Bulk uses newline-delimited JSON
-            request_headers["content-type"] = "application/x-ndjson"
         
         # Infino doesn't support /_stats - use _cat/indices to get real stats
         if self.database_type == "infino" and method == "GET" and "/_stats" in path:
@@ -632,20 +676,42 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             if self._bulk_request_counter % 100 == 0:
                 self.logger.info(f"Async bulk request progress for {self.database_type}: {self._bulk_request_counter} requests completed")
 
-        try:            
+        try:
+            if self.database_type == "infino":
+                self.logger.info(f"INFINO TRANSPORT CALL - method={method}, target={path}, headers={headers}")
             meta, resp_body = await self.transport.perform_request(
-                method=method, target=path, headers=request_headers, body=body
-            )    
+                method=method, target=path, headers=headers, body=body
+            )
+            if self.database_type == "infino" and "/_bulk" in path:
+                self.logger.info(f"INFINO BULK RESPONSE - status={getattr(meta, 'status', 'unknown')}, body_type={type(resp_body)}, body_preview={str(resp_body)[:200] if resp_body else 'None'}")
         except Exception as e:
             if self.database_type == "infino":
                 self.logger.error(f"INFINO ERROR - Request failed: {method} {path}, Error: {str(e)}, Type: {type(e)}")
+                if hasattr(e, 'body'):
+                    self.logger.error(f"INFINO ERROR - Response body: {e.body}")
             raise
 
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
         # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
         if not raw_response_requested:
+            # Handle BytesIO response format (common for bulk responses)
+            import io
+            if isinstance(resp_body, io.BytesIO):
+                resp_body.seek(0)  # Reset to beginning
+                content = resp_body.read()
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                if self.database_type == "infino" and "/_bulk" in path:
+                    self.logger.info(f"INFINO BULK BytesIO content: {content[:500] if content else 'EMPTY'}")
+                try:
+                    resp_body = json.loads(content)
+                except Exception as e:
+                    if self.database_type == "infino" and "/_bulk" in path:
+                        self.logger.error(f"INFINO BULK JSON parse error: {e}, content: {content[:200] if content else 'EMPTY'}")
+                    # Leave as string if not valid JSON
+                    resp_body = content
             # Handle Infino's string response format - always parse JSON strings
-            if isinstance(resp_body, str):
+            elif isinstance(resp_body, str):
                 try:
                     resp_body = json.loads(resp_body)
                 except Exception:
@@ -696,7 +762,12 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         # If Rally requested raw response, return a BytesIO of the raw body for fast-path parsing
         if raw_response_requested:
             # For raw responses, return the original response without transformation
-            if isinstance(resp_body, bytes):
+            import io
+            if isinstance(resp_body, io.BytesIO):
+                # If it's already a BytesIO, just return it as-is
+                resp_body.seek(0)  # Make sure we're at the beginning
+                return resp_body
+            elif isinstance(resp_body, bytes):
                 raw_bytes = resp_body
             elif isinstance(resp_body, str):
                 raw_bytes = resp_body.encode("utf-8")

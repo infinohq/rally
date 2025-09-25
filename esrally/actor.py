@@ -275,13 +275,13 @@ def bootstrap_actor_system(
     system_base = __SYSTEM_BASE
     capabilities: dict[str, Any] = {}
     log_defs: Any = None
-    if try_join and (
-        system_base != "multiprocTCPBase" or actor_system_already_running(ip=local_ip, port=local_port, system_base=system_base)
-    ):
-        LOG.info("Try joining already running actor system with system base [%s].", system_base)
+    if try_join and system_base == "multiprocTCPBase" and actor_system_already_running(ip=local_ip, port=local_port, system_base=system_base):
+        LOG.info("Try joining already running TCP actor system with system base [%s].", system_base)
+        LOG.info("Joining with capabilities: %s", capabilities)
     else:
         # All actor system are coordinator unless another coordinator is known to exist.
         capabilities["coordinator"] = True
+        LOG.info("Creating new actor system with coordinator capability")
 
         if system_base in ("multiprocTCPBase", "multiprocUDPBase"):
             if prefer_local_only:

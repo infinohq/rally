@@ -289,9 +289,17 @@ def race(cfg: types.Config, sources=False, distribution=False, external=False, d
     logger = logging.getLogger(__name__)
     # at this point an actor system has to run and we should only join
     actor_system = actor.bootstrap_actor_system(try_join=True)
-    benchmark_actor = actor_system.createActor(BenchmarkActor, targetActorRequirements={"coordinator": True})
     try:
+        benchmark_actor = actor_system.createActor(BenchmarkActor, targetActorRequirements={"coordinator": True})
+        logger.info("Created benchmark actor: %s", benchmark_actor)
+    except Exception as e:
+        logger.error("Failed to create BenchmarkActor: %s", str(e))
+        logger.error("Actor system capabilities: %s", actor_system.capabilities)
+        raise
+    try:
+        logger.info("Sending Setup message to benchmark actor...")
         result = actor_system.ask(benchmark_actor, Setup(cfg, sources, distribution, external, docker))
+        logger.info("Received result from benchmark actor: %s", result)
         if isinstance(result, Success):
             logger.info("Benchmark has finished successfully.")
         # may happen if one of the load generators has detected that the user has cancelled the benchmark.
