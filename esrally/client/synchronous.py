@@ -140,7 +140,7 @@ class RallySyncElasticsearch(Elasticsearch):
         distribution_version = kwargs.pop("distribution_version", None)
         distribution_flavor = kwargs.pop("distribution_flavor", None)
         self.database_type = kwargs.pop("database_type", "elasticsearch")
-        
+
         # Add Infino authentication headers to default headers for ALL requests
         if self.database_type == "infino":
             infino_headers = {
@@ -288,7 +288,7 @@ class RallySyncElasticsearch(Elasticsearch):
                 if self._verified_elasticsearch is not True:
                     _ProductChecker.raise_error(self._verified_elasticsearch, info_meta, info_body)
             else:
-                # Skip verification for OpenSearch and Infino
+                # Skip verification for OpenSearch, Infino, and other non-Elasticsearch databases
                 self.logger.debug(f"Skipping product verification for database type: {self.database_type}")
                 self._verified_elasticsearch = True
 

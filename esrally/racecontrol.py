@@ -218,12 +218,14 @@ class BenchmarkCoordinator:
                     self.cfg.add(config.Scope.benchmark, "driver", "serverless.operator", serverless_operator)
                 console.info(f"Detected Elasticsearch Serverless mode with operator=[{serverless_operator}].")
             else:
-                min_es_version = versions.Version.from_string(version.minimum_es_version())
-                specified_version = versions.Version.from_string(distribution_version)
-                if specified_version < min_es_version:
-                    raise exceptions.SystemSetupError(
-                        f"Cluster version must be at least [{min_es_version}] but was [{distribution_version}]"
-                    )
+                # Skip version check for OpenSearch and Infino
+                if distribution_flavor not in ("opensearch", "infino"):
+                    min_es_version = versions.Version.from_string(version.minimum_es_version())
+                    specified_version = versions.Version.from_string(distribution_version)
+                    if specified_version < min_es_version:
+                        raise exceptions.SystemSetupError(
+                            f"Cluster version must be at least [{min_es_version}] but was [{distribution_version}]"
+                        )
 
         self.current_track = track.load_track(self.cfg, install_dependencies=True)
         self.track_revision = self.cfg.opts("track", "repository.revision", mandatory=False)

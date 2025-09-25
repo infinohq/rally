@@ -330,7 +330,8 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                     if isinstance(inner_query, dict):
                         # Replace nested query with a simplified version
                         if "bool" in inner_query:
-                            return inner_query["bool"]
+                            bool_query = inner_query["bool"]
+                            return bool_query if bool_query is not None else inner_query
                         elif "term" in inner_query or "match" in inner_query or "range" in inner_query:
                             return {"bool": {"must": [inner_query]}}
                         else:
@@ -495,7 +496,7 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 body_str = str(body)[:200] if body else "None"
                 self.logger.info("INFINO BULK REQUEST - Body preview: %s", body_str)
 
-        # Fix incompatible sort and aggregation queries for search operations only
+        # Fix sort and aggregation queries for search operations only
         if body and isinstance(body, (dict, str)) and ("/_search" in path or "/search" in path):
             import json
             if isinstance(body, str):
@@ -679,11 +680,34 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
         try:
             if self.database_type == "infino":
                 self.logger.info(f"INFINO TRANSPORT CALL - method={method}, target={path}, headers={headers}")
+            # Add full debug logging for Elasticsearch
+            if self.database_type == "elasticsearch":
+                self.logger.info(f"ELASTICSEARCH REQUEST - method={method}, target={target}, headers={headers}, body_type={type(body)}, body_preview={str(body)[:500] if body else 'None'}")
             meta, resp_body = await self.transport.perform_request(
-                method=method, target=path, headers=headers, body=body
+                method,
+                target,
+                headers=headers,
+                body=body,
+                request_timeout=self._request_timeout,
+                max_retries=self._max_retries,
+                retry_on_status=self._retry_on_status,
+                retry_on_timeout=self._retry_on_timeout,
+                client_meta=self._client_meta,
             )
+            # Log full response for Elasticsearch
+            if self.database_type == "elasticsearch":
+                self.logger.info(f"ELASTICSEARCH RESPONSE - method={method}, target={target}, status={meta.status}, resp_body_type={type(resp_body)}, resp_body={str(resp_body)[:500] if resp_body else 'None'}")
+            # More debugging for Elasticsearch
+            if self.database_type == "elasticsearch" and method == "HEAD":
+                self.logger.info(f"ELASTICSEARCH HEAD response - path={path}, target={target}, meta={meta}, resp_body={resp_body}, type={type(resp_body)}")
             if self.database_type == "infino" and "/_bulk" in path:
                 self.logger.info(f"INFINO BULK RESPONSE - status={getattr(meta, 'status', 'unknown')}, body_type={type(resp_body)}, body_preview={str(resp_body)[:200] if resp_body else 'None'}")
+            # Debug logging for Elasticsearch to track the NoneType issue
+            if self.database_type == "elasticsearch":
+                if resp_body is None:
+                    self.logger.error(f"ELASTICSEARCH ERROR - Got None response for {method} {path}")
+                if "index-append" in str(body) or "_bulk" in path:
+                    self.logger.info(f"ELASTICSEARCH BULK - method={method}, path={path}, body_type={type(resp_body)}, is_none={resp_body is None}")
         except Exception as e:
             if self.database_type == "infino":
                 self.logger.error(f"INFINO ERROR - Request failed: {method} {path}, Error: {str(e)}, Type: {type(e)}")
@@ -691,9 +715,23 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                     self.logger.error(f"INFINO ERROR - Response body: {e.body}")
             raise
 
+        # For Elasticsearch, we need to parse BytesIO responses even when raw_response is requested
+        # because the bulk runner expects ObjectApiResponse, not BytesIO
+        if self.database_type == "elasticsearch" and isinstance(resp_body, BytesIO):
+            import io
+            resp_body.seek(0)
+            content = resp_body.read()
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+            try:
+                resp_body = json.loads(content)
+            except Exception:
+                # If not valid JSON, leave as string
+                resp_body = content
+
         # If raw response is requested, avoid any transformation/parsing. We'll convert to BytesIO below.
         # Otherwise, normalize Infino JSON-string bodies to dicts to keep the rest of Rally happy.
-        if not raw_response_requested:
+        if not raw_response_requested and self.database_type == "infino":
             # Handle BytesIO response format (common for bulk responses)
             import io
             if isinstance(resp_body, io.BytesIO):
@@ -731,7 +769,7 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
             not 200 <= meta.status < 299
             and (self._ignore_status is DEFAULT or self._ignore_status is None or meta.status not in self._ignore_status)
         ):
-            message = str(resp_body)
+            message = str(resp_body) if resp_body is not None else ""
 
             # If the response is an error response try parsing
             # the raw Elasticsearch error before raising.
@@ -771,6 +809,9 @@ class RallyAsyncDatabase(AsyncElasticsearch, RequestContextHolder):
                 raw_bytes = resp_body
             elif isinstance(resp_body, str):
                 raw_bytes = resp_body.encode("utf-8")
+            elif resp_body is None:
+                # For None responses (like HEAD requests), return empty BytesIO
+                raw_bytes = b""
             else:
                 try:
                     raw_bytes = json.dumps(resp_body).encode("utf-8")

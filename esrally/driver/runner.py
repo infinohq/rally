@@ -671,14 +671,40 @@ class BulkIndex(Runner):
                 "error-count": bulk_error_count,
             }
         else:
-            # Elasticsearch or OpenSearch - handle ObjectApiResponse
-            if hasattr(response, 'body'):
+            # Elasticsearch or OpenSearch - handle ObjectApiResponse or BytesIO
+            import io
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"ELASTICSEARCH BULK RESPONSE - type={type(response)}, has_body={hasattr(response, 'body')}, response={str(response)[:500]}")
+
+            if isinstance(response, io.BytesIO):
+                # Handle BytesIO response (when raw_response is requested for Elasticsearch)
+                raw_content = response.getvalue()
+                logger.info(f"ELASTICSEARCH BULK - BytesIO raw content type: {type(raw_content)}, content: {raw_content[:500] if raw_content else 'EMPTY'}")
+                if isinstance(raw_content, bytes):
+                    try:
+                        parsed_response = json.loads(raw_content.decode('utf-8'))
+                    except Exception as e:
+                        logger.error(f"ELASTICSEARCH BULK - Failed to parse BytesIO as JSON: {e}, content: {raw_content[:500]}")
+                        # Fall back to parse() for BytesIO
+                        response.seek(0)
+                        parsed_response = parse(response, ["took", "errors", "items"])
+                else:
+                    parsed_response = json.loads(raw_content)
+                logger.info(f"ELASTICSEARCH BULK - Parsed BytesIO response: {type(parsed_response)}, value={str(parsed_response)[:500] if parsed_response else 'None'}")
+            elif hasattr(response, 'body'):
                 # It's an ObjectApiResponse - get the body dict
                 parsed_response = response.body
+                logger.info(f"ELASTICSEARCH BULK - Got body from ObjectApiResponse: {type(parsed_response)}, value={str(parsed_response)[:500] if parsed_response else 'None'}")
             else:
                 # Fallback to original parse method
                 parsed_response = parse(response, ["took", "errors", "items"])
-            
+                logger.info(f"ELASTICSEARCH BULK - Parsed response using parse(): {type(parsed_response)}, value={str(parsed_response)[:500] if parsed_response else 'None'}")
+
+            if parsed_response is None:
+                logger.error(f"ELASTICSEARCH BULK ERROR - parsed_response is None! response type={type(response)}")
+                raise RuntimeError(f"parsed_response is None for Elasticsearch bulk operation. Response type: {type(response)}")
+
             for item in parsed_response.get("items", []):
                 data = next(iter(item.values()))
                 status = data.get("status", 0)
