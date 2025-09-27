@@ -228,11 +228,13 @@ class RallySyncElasticsearch(Elasticsearch):
         # We need to ensure that we provide content-type and accept headers
         if body is not None:
             if headers is None:
-                headers = {"content-type": "application/json", "accept": "application/json"}
+                headers = {"content-type": "application/json"}
+                if self.database_type != "infino":
+                    headers["accept"] = "application/json"
             else:
                 if headers.get("content-type") is None:
                     headers["content-type"] = "application/json"
-                if headers.get("accept") is None:
+                if headers.get("accept") is None and self.database_type != "infino":
                     headers["accept"] = "application/json"
         
         # For non-Elasticsearch databases, ensure we never apply Elasticsearch 8.x headers
@@ -311,7 +313,7 @@ class RallySyncElasticsearch(Elasticsearch):
             # Just ensure the headers are set to standard values
             if "content-type" not in routed_headers:
                 routed_headers["content-type"] = "application/json"
-            if "accept" not in routed_headers:
+            if "accept" not in routed_headers and self.database_type != "infino":
                 routed_headers["accept"] = "application/json"
         elif self.database_type == "infino":
             # Infino needs standard headers, not the Elasticsearch 8.x format
